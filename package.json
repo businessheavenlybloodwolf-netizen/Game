@@ -1,0 +1,25 @@
+{
+  "name": "lumi-und-das-morgenlicht",
+  "version": "1.0.0",
+  "description": "3D-Platformer im Browser: LUMI und das Morgenlicht",
+  "scripts": {
+    "build": "node build.mjs"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/businessheavenlybloodwolf-netizen/Game.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/businessheavenlybloodwolf-netizen/Game/issues"
+  },
+  "homepage": "https://github.com/businessheavenlybloodwolf-netizen/Game#readme",
+  "dependencies": {
+    "three": "^0.170.0"
+  },
+  "devDependencies": {
+    "esbuild": "^0.28.2"
+  }
+}
