@@ -51,9 +51,10 @@ Beim Aufprall breitet sich ein **lila Ring** über die ganze Arena aus.
 **④ Benommen – jetzt angreifen!**
 Nach dem Aufprall sitzt der Boss **benommen** am Boden. Sein Kristall auf dem Kopf blinkt.
 - Das ist der **einzige Moment, in dem du ihm schaden kannst**.
-- **Spring auf seinen Kopf.** Er ist etwa 4 m hoch, ein einfacher Sprung reicht nicht.
-  - Lauf auf ihn zu, **springe** und drücke **ganz oben noch einmal Springen** (Doppelsprung). Lenke auf seinen Kopf.
-  - Landen kannst du irgendwo oben auf ihm. Auch eine Stampfattacke (Shift / C) auf dem Kopf zählt.
+- **Spring auf seinen Kopf.** Die Trefferzone ist die obere Kuppel seines Körpers, genau so, wie er aussieht.
+  - Am **Rand** der Kuppel beginnt sie schon bei etwa **3 m Höhe**, in der Mitte erst bei gut **4 m**. Ein einfacher Sprung (gut 2,5 m) reicht nicht.
+  - Lauf auf ihn zu, **springe** und drücke **ganz oben noch einmal Springen** (Doppelsprung). Lenke auf seinen Kopf. **Am Rand des Kopfes zu landen ist am leichtesten.**
+  - Auch eine Stampfattacke (Shift / C) auf dem Kopf zählt.
   - Notfalls hilft die **Drehattacke** in der Luft (F / J): Sie hebt dich noch ein kleines Stück an.
 - Während er benommen ist, schadet dir eine Berührung **nicht**. Prallst du seitlich an ihm ab, versuch es einfach noch einmal.
 - Nach einem Treffer schleudert er dich weg, fliegt wieder hoch, und der Kreislauf beginnt von vorn, **jedes Mal etwas schneller**.
@@ -74,6 +75,9 @@ Ab dem **zweiten Treffer** ruft der Boss bei jedem Aufprall Helfer herbei, spät
 - **Steinsäulen** stehen rund um den Rand. An ihnen kann man hängen bleiben, also lieber in der Mitte bleiben.
 - **Kamera:** Im Bosskampf zoomt sie automatisch heraus. Mit Maus / Q-E / rechtem Stick kannst du nachjustieren, damit du Schatten und Ring siehst.
 - **Wenn er hoch schwebt, kommst du nicht an ihn heran.** Berührst du ihn dort mit einem Sprung, kostet das ein Herz.
+  Das gilt auch für seine **schwebenden Hände** links und rechts. Die Schadenszone ist etwas kleiner als der sichtbare Körper, knappe Ausweichmanöver werden also belohnt.
+- Der **rote Zielring** einer Nebelkugel zeigt genau den Explosionsbereich: Bist du mit dem ganzen Körper draußen, passiert dir nichts.
+- **Debug-Ansicht:** Mit **F4** werden die Hitboxen sichtbar. Rot ist die Schadenszone (Körper und Hände), grün die Kopf-Trefferzone, blau der feste Unterkörper.
 - Nach jedem Sieg gibt es einen **großen Mondsplitter (zählt 3)** und den **Kristall des Morgenlichts** (bzw. beim Finale den Kern).
 
 ---
@@ -88,7 +92,7 @@ Die Tabellenwerte gelten pro Runde. Runde 1 ist der Start, jede weitere Runde be
 - **Welle:** So lange braucht die Schockwelle bis zum Arenarand (kürzer = schneller).
 
 ### Reich 1 – Moderich der Welke (Blütenwiesen)
-*Ein welker Nebelfürst mit Blätterkranz.* **3 Treffer.** Helfer: **Neblinge**.
+*Ein welk-brauner Nebelfürst mit grünem Blätterkranz.* **3 Treffer.** Helfer: **Neblinge**.
 
 | Runde | Würfe | Abstand | Vorwarnung | Benommen | Welle |
 |---|---|---|---|---|---|

@@ -80,7 +80,10 @@ class Game {
     const fpsEl = document.createElement('div'); fpsEl.id = 'fps'; document.body.appendChild(fpsEl);
     try { this.showFps = localStorage.getItem('lumi_fps') === '1'; } catch (e) { this.showFps = false; }
     fpsEl.style.display = this.showFps ? 'block' : 'none';
-    window.addEventListener('keydown', (e) => { if (e.code === 'F3') { e.preventDefault(); this.toggleFps(); } });
+    window.addEventListener('keydown', (e) => {
+      if (e.code === 'F3') { e.preventDefault(); this.toggleFps(); }
+      if (e.code === 'F4') { e.preventDefault(); this.debugHitbox = !this.debugHitbox; }
+    });
 
     window.addEventListener('resize', () => {
       this.camera.aspect = window.innerWidth / window.innerHeight;

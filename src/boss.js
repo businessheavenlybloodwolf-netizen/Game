@@ -3,6 +3,15 @@ import * as THREE from 'three';
 import * as M from './models.js';
 import { cylCollider, groundBelow } from './physics.js';
 
+// Hitbox-Maße passend zum Modell: Körper = Kugel r 2.3, vertikal auf 0.92 gestaucht, Mittelpunkt 2.2 über dem Boden
+const BODY_R = 2.3, BODY_RY = 2.3 * 0.92, BODY_CY = 2.2;
+const PLAYER_R = 0.35;          // Lumis Radius für Schadensprüfung
+const HURT_FORGIVE = 0.92;      // Schadens-Hitbox etwas kleiner als das Modell (fairer)
+const STOMP_EXTRA = 0.12;       // Kopfsprung-Zone etwas größer als das Modell (großzügiger)
+const STOMP_CAP = 0.35;         // ab dieser relativen Höhe zählt die Kuppel als Kopf
+const HAND_R = 0.7;
+const _v = new THREE.Vector3();
+
 export class Boss {
   constructor(level, x, top, z, arenaR, cfg = {}) {
     this.level = level; this.game = level.game;
@@ -19,7 +28,8 @@ export class Boss {
     if (level.spec.star) this.speed *= 1.15;
     this.state = 'wait'; this.t = 0; this.throws = 0; this.throwT = 0;
     this.angle = 0;
-    this.col = cylCollider(x, z, 2.1, top, top + 4.0, { disabled: true, onLand: (pl) => this.onStomp(pl) });
+    this.col = cylCollider(x, z, 2.0, top, top + BODY_CY, { disabled: true });
+    this.debugMesh = null;
     level.colliders.push(this.col);
     this.wave = null;
     this.shadow = new THREE.Mesh(new THREE.CircleGeometry(2.6, 32), new THREE.MeshBasicMaterial({ color: 0x000000, transparent: true, opacity: 0.35, depthWrite: false }));
@@ -45,6 +55,7 @@ export class Boss {
 
   update(dt, player) {
     this.t += dt;
+    this.updateDebug();
     const u = this.mesh.userData;
     const time = this.level.time;
     // Animation
@@ -184,7 +195,7 @@ export class Boss {
     const mesh = new THREE.Mesh(new THREE.SphereGeometry(0.55, 14, 10), M.toon(0x3a2358, { emissive: oc, ei: 0.5 }));
     mesh.add(M.glowSprite(oc, 2.2, 0.7));
     mesh.position.copy(start); L.add(mesh);
-    const marker = new THREE.Mesh(new THREE.RingGeometry(0.9, 1.3, 28), new THREE.MeshBasicMaterial({ color: 0xff4070, transparent: true, opacity: 0.7, depthWrite: false }));
+    const marker = new THREE.Mesh(new THREE.RingGeometry(0.85, 1.2, 28), new THREE.MeshBasicMaterial({ color: 0xff4070, transparent: true, opacity: 0.7, depthWrite: false }));
     marker.rotation.x = -Math.PI / 2; marker.position.set(target.x, target.y + 0.06, target.z); L.add(marker);
     const pr = {
       t: 0,
@@ -198,14 +209,14 @@ export class Boss {
           g.audio.play('boom');
           g.particles.burst(mesh.position, { count: 16, color: [0x8a3cff, 0x3a2358, 0xffffff], speed: 6, size: 1.1 });
           const p = g.player.pos;
-          if (Math.hypot(p.x - mesh.position.x, p.z - mesh.position.z) < 1.6 && Math.abs(p.y - mesh.position.y) < 1.8) g.player.hurt(mesh.position);
+          if (Math.hypot(p.x - mesh.position.x, p.z - mesh.position.z) < 1.2 + PLAYER_R && Math.abs(p.y - mesh.position.y) < 1.8) g.player.hurt(mesh.position);
           return true;
         }
         return false;
       },
       check: (player) => {
         const p = player.pos;
-        if (mesh.parent && mesh.position.distanceTo(new THREE.Vector3(p.x, p.y + 0.6, p.z)) < 1.0) player.hurt(mesh.position);
+        if (mesh.parent) for (const h of [0.25, 0.65, 1.05]) { if ((p.x - mesh.position.x) ** 2 + (p.y + h - mesh.position.y) ** 2 + (p.z - mesh.position.z) ** 2 < (0.55 + PLAYER_R) ** 2) { player.hurt(mesh.position); break; } }
       },
     };
     L.projectiles.push(pr);
@@ -230,15 +241,74 @@ export class Boss {
     this.game.hud.toast(this.hp <= 0 ? lines[lines.length - 1] : lines[(this.maxHp - this.hp - 1) % (lines.length - 1)]);
   }
 
+  // Abstand eines Punkts zum Körper-Ellipsoid (1 = genau auf der Oberfläche)
+  ellipsoid(x, y, z, ra, ry) {
+    const dx = (x - this.pos.x) / ra, dy = (y - (this.pos.y + BODY_CY)) / ry, dz = (z - this.pos.z) / ra;
+    return Math.sqrt(dx * dx + dy * dy + dz * dz);
+  }
+
   interact(player) {
     if (!player.alive) return;
     const p = player.pos;
-    const bodyY = this.pos.y + 2.2;
-    const d = Math.hypot(p.x - this.pos.x, p.z - this.pos.z);
-    if (this.state === 'hover' || this.state === 'rise' || this.state === 'slam' || this.state === 'intro' || this.state === 'warn') {
-      const dy = (p.y + 0.6) - bodyY;
-      if (Math.hypot(d, dy) < 2.6) player.hurt(this.pos);
+    const cy = this.pos.y + BODY_CY;
+    if (this.state === 'dazed') {
+      // Kopf als Kuppel: Fällt Lumi mit den Füßen hinein, zählt das als Treffer – egal ob mittig oder am Rand
+      const e = this.ellipsoid(p.x, p.y, p.z, BODY_R, BODY_RY);
+      if (e < 1 + STOMP_EXTRA && p.y >= cy - 0.2) {
+        // Treffer nur auf der oberen Kappe (Füße mindestens ~0,75 m über der Körpermitte, also ca. 3 m Höhe)
+        if (player.vel.y <= 0.5 && p.y >= cy + STOMP_CAP * BODY_RY) { this.onStomp(player); return; }
+        // seitlich: an der Körperform abprallen statt hineinzurutschen
+        const dy = (p.y - cy) / BODY_RY;
+        const rh = BODY_R * Math.sqrt(Math.max(0, (1 + STOMP_EXTRA) ** 2 - dy * dy));
+        const dx = p.x - this.pos.x, dz = p.z - this.pos.z, l = Math.hypot(dx, dz) || 1;
+        p.x = this.pos.x + dx / l * rh; p.z = this.pos.z + dz / l * rh;
+        const vn = (player.vel.x * dx + player.vel.z * dz) / l;
+        if (vn < 0) { player.vel.x -= vn * dx / l; player.vel.z -= vn * dz / l; }
+      }
+      return;
     }
+    if (this.state === 'hover' || this.state === 'rise' || this.state === 'slam' || this.state === 'intro' || this.state === 'warn') {
+      // Lumi an drei Punkten prüfen (Füße, Mitte, Kopf) gegen Körper-Ellipsoid und beide Hände
+      const ra = BODY_R * HURT_FORGIVE + PLAYER_R, ry = BODY_RY * HURT_FORGIVE + PLAYER_R;
+      const hands = this.mesh.userData.hands;
+      for (const h of [0.25, 0.65, 1.05]) {
+        const y = p.y + h;
+        if (this.ellipsoid(p.x, y, p.z, ra, ry) < 1) { player.hurt(this.pos); return; }
+        for (const hand of hands) {
+          hand.getWorldPosition(_v);
+          const rr = HAND_R * HURT_FORGIVE + PLAYER_R;
+          if ((p.x - _v.x) ** 2 + (y - _v.y) ** 2 + (p.z - _v.z) ** 2 < rr * rr) { player.hurt(_v.clone()); return; }
+        }
+      }
+    }
+  }
+
+  // Debug-Ansicht der Hitboxen (F4)
+  updateDebug() {
+    const on = !!this.game.debugHitbox && this.mesh.visible;
+    if (on && !this.debugMesh) {
+      const g = new THREE.Group();
+      const wire = (color) => new THREE.MeshBasicMaterial({ color, wireframe: true, transparent: true, opacity: 0.6, depthTest: false });
+      const body = new THREE.Mesh(new THREE.SphereGeometry(1, 20, 12), wire(0xff3060)); body.name = 'hurt'; g.add(body);
+      const head = new THREE.Mesh(new THREE.SphereGeometry(1, 20, 12, 0, Math.PI * 2, 0, Math.acos(STOMP_CAP)), wire(0x40ff80)); head.name = 'stomp'; g.add(head);
+      const cyl = new THREE.Mesh(new THREE.CylinderGeometry(2.0, 2.0, BODY_CY, 20, 1, true), wire(0x60a0ff)); cyl.name = 'solid'; g.add(cyl);
+      for (let i = 0; i < 2; i++) { const h = new THREE.Mesh(new THREE.SphereGeometry(HAND_R * HURT_FORGIVE, 10, 8), wire(0xff3060)); h.name = 'hand' + i; g.add(h); }
+      g.renderOrder = 999;
+      this.level.add(g);
+      this.debugMesh = g;
+    }
+    if (!this.debugMesh) return;
+    const g = this.debugMesh;
+    g.visible = on;
+    if (!on) return;
+    const dazed = this.state === 'dazed';
+    const cy = this.pos.y + BODY_CY;
+    const body = g.getObjectByName('hurt'), head = g.getObjectByName('stomp'), cyl = g.getObjectByName('solid');
+    body.visible = !dazed; head.visible = dazed; cyl.visible = dazed;
+    body.position.set(this.pos.x, cy, this.pos.z); body.scale.set(BODY_R * HURT_FORGIVE, BODY_RY * HURT_FORGIVE, BODY_R * HURT_FORGIVE);
+    head.position.set(this.pos.x, cy, this.pos.z); head.scale.set(BODY_R * (1 + STOMP_EXTRA), BODY_RY * (1 + STOMP_EXTRA), BODY_R * (1 + STOMP_EXTRA));
+    cyl.position.set(this.pos.x, this.top + BODY_CY / 2, this.pos.z);
+    this.mesh.userData.hands.forEach((h, i) => { const m = g.getObjectByName('hand' + i); h.getWorldPosition(m.position); m.visible = !dazed; });
   }
 
   shockwave() {}

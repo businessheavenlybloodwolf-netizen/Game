@@ -7,7 +7,7 @@ export const WORLDS = [
     style: { big: 'grass', small: 'grass', pillar: 'stone', mover: 'wood', crumbleMat: 'stone', bridge: 'wood', blinkMat: 'wood', decor: 'meadow', trees: ['round', 'blossom'], bouncerColor: 0xff7ab8, goalMat: 'stone', islandKind: 'round' },
     enemies: ['nebling', 'nebling', 'flatterling'],
     seg: { hops: 3, stairs: 2, descend: 1, moverGap: 1, bounceUp: 1.5, pillars: 1, bridge: 1, circleMover: 0.4 },
-    boss: { color: 0x8ab86a, accent: 0x3a6a2a, accentGlow: 0x2a5a1a, style: 'leaves', puff: 0xa8c890, monocle: false, hp: 3, speed: 0.8, minion: 'nebling' },
+    boss: { color: 0xa87a58, accent: 0x5a9a3a, accentGlow: 0x2a5a1a, style: 'leaves', puff: 0xc8b090, monocle: false, hp: 3, speed: 0.8, minion: 'nebling' },
   },
   {
     id: 'crystal', music: 'crystal', color: '#8ff3ff',
