@@ -77,9 +77,9 @@ html, body { margin: 0; height: 100%; overflow: hidden; background: #1a1020; fon
 #dialog { position: fixed; left: 50%; bottom: 4vh; transform: translateX(-50%) translateY(30px); width: min(760px, 94vw); background: rgba(255, 241, 214, .97); color: #4a2a1e; border: 4px solid #3a1f14; border-radius: 22px; padding: 30px 26px 22px; opacity: 0; pointer-events: none; transition: all .3s; box-shadow: 0 8px 0 rgba(58, 31, 20, .45); cursor: pointer; }
 #dialog.show { opacity: 1; transform: translateX(-50%); pointer-events: auto; }
 #dialog .who { position: absolute; top: -20px; left: 22px; background: #2fb5a8; color: #fff; border: 3px solid #3a1f14; border-radius: 12px; padding: 3px 14px; font-weight: 900; font-size: 18px; }
-#dialog[data-who="Elva"] .who { background: #e98a3c; }
-#dialog[data-who="Graf Nebelmaul"] .who { background: #6a4c99; }
-#dialog[data-who="Erzählung"] .who { background: #8a6a5a; }
+#dialog[data-who="e"] .who { background: #e98a3c; }
+#dialog[data-who="b"] .who { background: #6a4c99; }
+#dialog[data-who="n"] .who { background: #8a6a5a; }
 #dialog .text { font-size: clamp(17px, 2.2vw, 21px); font-weight: 700; line-height: 1.45; min-height: 3em; }
 #dialog .next { position: absolute; right: 18px; bottom: 10px; font-size: 14px; font-weight: 900; opacity: .6; animation: blink 1s infinite; }
 @keyframes blink { 50% { opacity: .15; } }
@@ -112,6 +112,34 @@ html, body { margin: 0; height: 100%; overflow: hidden; background: #1a1020; fon
   #dialog { padding: 22px 18px 16px; }
   #hint { font-size: 14px; bottom: 150px; }
 }
+
+.moon { display: inline-block; width: 20px; height: 22px; background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 22'%3E%3Cpath d='M13 2 A9 9 0 1 0 18 17 A7 7 0 1 1 13 2Z' fill='%23403050' stroke='%23fff1d6' stroke-width='1.5'/%3E%3C/svg%3E") center/contain no-repeat; vertical-align: middle; }
+.moon.full { background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 22'%3E%3Cpath d='M13 2 A9 9 0 1 0 18 17 A7 7 0 1 1 13 2Z' fill='%23d8e8ff' stroke='%233a1f14' stroke-width='1.5'/%3E%3C/svg%3E"); filter: drop-shadow(0 0 4px #9ab8ff); }
+.shard { width: 14px; height: 22px; }
+.items button .lvl { display: flex; align-items: center; gap: 8px; justify-content: space-between; width: 100%; }
+.items button .lvl .nm { text-align: left; }
+.items button .lvl .ic { display: flex; gap: 2px; align-items: center; font-size: 15px; white-space: nowrap; }
+.items button small { display: block; font-size: 12px; opacity: .75; font-weight: 800; }
+.map .panel { min-width: min(520px, 94vw); }
+.map .items button { min-width: min(460px, 86vw); }
+.map .worldname { font-size: 34px; font-weight: 900; }
+.map .worldbar { display: flex; justify-content: center; gap: 6px; margin: 6px 0 12px; flex-wrap: wrap; }
+.map .worldbar span { width: 18px; height: 18px; border-radius: 50%; border: 2px solid #3a1f14; opacity: .35; }
+.map .worldbar span.open { opacity: 1; }
+.map .worldbar span.cur { transform: scale(1.35); box-shadow: 0 0 0 2px #fff8e6; }
+.medal { color: #c98a00; font-size: 15px; }
+.keyic { font-size: 15px; }
+.langs { display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; }
+.stats .moonsrow { display: flex; gap: 6px; justify-content: center; }
+@media (max-height: 520px) {
+  .map .worldname { font-size: 22px; }
+  .map .items { gap: 4px; }
+  .items button small { font-size: 10px; }
+}
+.map .items { gap: 6px; }
+.map .items button { padding: 6px 16px; font-size: 17px; }
+.map .panel { padding: 16px 24px; }
+.map .worldname { font-size: 28px; }
 </style>
 </head>
 <body>
@@ -123,6 +151,7 @@ html, body { margin: 0; height: 100%; overflow: hidden; background: #1a1020; fon
   </div>
   <div class="tr">
     <div class="pill" id="sparks"></div>
+    <div class="pill" id="moons"></div>
     <div class="pill" id="shards"></div>
     <div class="pill" id="timer">0:00</div>
   </div>
@@ -134,14 +163,14 @@ html, body { margin: 0; height: 100%; overflow: hidden; background: #1a1020; fon
 <div id="touch">
   <div class="camzone"></div>
   <div class="stick"><div class="knob"></div></div>
-  <div data-btn="jump">Sprung</div>
-  <div data-btn="spin">Dreh</div>
-  <div data-btn="pound">Stampf</div>
+  <div data-btn="jump"></div>
+  <div data-btn="spin"></div>
+  <div data-btn="pound"></div>
   <div data-btn="pause">II</div>
 </div>
 <div id="fade"></div>
 <div id="screen"></div>
-<div id="dialog"><div class="who"></div><div class="text"></div><div class="next">weiter ▶</div></div>
+<div id="dialog"><div class="who"></div><div class="text"></div><div class="next">▶</div></div>
 <div id="error"></div>
 <script src="game.js"></script>
 </body>

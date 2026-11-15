@@ -1,18 +1,15 @@
-// Level-Design. Koordinaten: y = Oberkante der Plattform. Der Weg führt grob Richtung -Z.
-export const LEVELS = [
+// Handgebaute erste Level der Welten 1–3. Alle anderen Level baut der Generator.
+export const HANDMADE = [
   // ============================================================ 1
   {
     id: 'meadow', name: 'Blütenwiesen', sub: 'Welt 1', music: 'meadow', seed: 11,
-    theme: {
-      skyTop: 0x4aa8f5, skyHorizon: 0xffe0ee, skyBottom: 0xffd2e6, fog: 0xffe3f0, fogNear: 70, fogFar: 280,
-      hemiSky: 0xdff2ff, hemiGround: 0x7a9a5a, hemiI: 1.7, sunI: 2.7, sunDir: [0.4, 0.85, 0.35], sea: 'cloudSea', seaY: -40,
-    },
     bouncerColor: 0xff7ab8,
     build(L) {
+      L.par = 80;
       L.spawn(0, 0, 3, 0);
       L.cyl(0, 0, 0, 8, { decor: 'meadow' });
       L.tree(-5, 0, 3, 'blossom'); L.tree(5.5, 0, 2); L.tree(-4.5, 0, -4.5); L.rock(5, 0, -4);
-      L.hint(2.6, 0, -3, 3.2, 'Bewegen: WASD / Pfeiltasten · Springen: LEERTASTE · in der Luft nochmal drücken = Doppelsprung! Kamera: Maus ziehen oder Q / E');
+      L.hint(2.6, 0, -3, 3.2, 'move');
       L.sparkLine([0, 1, -3], [0, 1, -7], 3);
       L.box(0, 1, -13, 6, 6, { decor: 'meadow' });
       L.sparkLine([0, 2.2, -11], [0, 2.2, -15], 3);
@@ -21,14 +18,14 @@ export const LEVELS = [
       // Wiese mit Neblingen
       L.box(0, 2.5, -34, 14, 14, { decor: 'meadow' });
       L.checkpoint(-5, 2.5, -29);
-      L.hint(5, 2.5, -29, 3, 'Neblinge! Spring ihnen auf den Kopf – oder wirbel sie mit der Drehattacke weg (F / J / Linksklick).');
+      L.hint(5, 2.5, -29, 3, 'enemy');
       L.enemy('nebling', 3, 2.5, -33, { range: 3 });
       L.enemy('nebling', -3, 2.5, -37, { range: 3 });
       L.crate(-5.2, 2.5, -38.5, 5);
-      L.hint(-5.2, 2.5, -36, 2, 'Kisten zerbrechen mit der Drehattacke oder mit einer Stampfattacke (in der Luft SHIFT / C).', false);
+      L.hint(-5.2, 2.5, -36, 2, 'crate', false);
       L.tree(5.5, 2.5, -39.5, 'blossom'); L.tree(-5.5, 2.5, -31.5);
       L.bouncer(0, 2.5, -39.3, 23);
-      L.hint(2.5, 2.5, -38, 2.2, 'Spring auf die Sprungblüte, um hoch hinaus zu fliegen!', false);
+      L.hint(2.5, 2.5, -38, 2.2, 'bouncer', false);
       // Hochplateau
       L.box(0, 8, -50, 12, 10, { decor: 'meadow' });
       L.tree(-4, 8, -52); L.tree(4.5, 8, -47.5, 'blossom');
@@ -36,7 +33,7 @@ export const LEVELS = [
       L.sparkLine([-3, 9, -46], [3, 9, -46], 4);
       L.heart(4, 9.2, -53);
       L.mover({ from: [0, 8, -60], to: [0, 8, -74], w: 4, d: 4, period: 6 });
-      L.hint(-3, 8, -54, 2.5, 'Bewegliche Plattformen nehmen dich mit. Ein bisschen Mut!', true);
+      L.hint(-3, 8, -54, 2.5, 'mover', true);
       L.sparkLine([0, 9.4, -61], [0, 9.4, -73], 5);
       // Insel & Säulen
       L.cyl(0, 8, -82, 5, { decor: 'meadow' });
@@ -54,7 +51,14 @@ export const LEVELS = [
       L.goalAt(0, 13, -115);
       // Bonus: Wolkenschatz
       L.bouncer(3.8, 13, -110, 26);
-      L.sparkRing(3.8, 23, -110, 2, 8);
+      L.sparkRing(3.8, 21, -110, 2, 8);
+      L.moonstone(3.8, 21.2, -110, 0);
+      // Geheimnis unter der Startinsel
+      L.hint(-2.6, 0, 3.5, 2.6, 'moonstones');
+      L.cyl(0, -7, 13.5, 2.5, { mat: 'grass', h: 2 });
+      L.bouncer(-1, -7, 13.8, 30);
+      L.moonstone(1, -5.6, 13.2, 1);
+      L.link([0, 0, 7.4], [1, -7, 13.2], {}); L.link([-1, -6.1, 13.8], [0, 0, 5], { via: [-1, 13.8], viaY: 3 });
       // Kulisse
       L.distantIsland(-45, 10, 25, 11, { trees: 4 });
       L.lighthouse(-45, 11.75, 25, 1.6);
@@ -69,23 +73,19 @@ export const LEVELS = [
   // ============================================================ 2
   {
     id: 'crystal', name: 'Kristallschlucht', sub: 'Welt 2', music: 'crystal', seed: 22,
-    theme: {
-      skyTop: 0x150f35, skyHorizon: 0x8a5fc0, skyBottom: 0x2a1d50, fog: 0x5a3f8a, fogNear: 45, fogFar: 210,
-      hemiSky: 0xc0b0ff, hemiGround: 0x3a2a5a, hemiI: 1.5, sunI: 2.0, sunLight: 0xffd0f0, sunColor: 0xffb0e0, sunDir: [-0.5, 0.6, 0.4],
-      sea: 'cloudSeaDusk', seaY: -40, stars: 0.6,
-    },
     crystalColor: 0x8ff3ff, crumbleMat: 'stone', goalMat: 'crystal', rockColor: 0x5a4a7a, firebarColor: 0xff6ad5, bouncerColor: 0x7ef0ff,
     build(L) {
+      L.par = 85;
       L.spawn(0, 0, 3, 0);
       L.box(0, 0, 0, 10, 10, { mat: 'crystal', decor: 'crystal' });
       L.crystal(-4, 0, 3.5, 0x8ff3ff, 1.6); L.crystal(4, 0, 3.8, 0xc59bff, 1.5);
-      L.hint(3, 0, -2.5, 3, 'Bröckelplatten zerfallen kurz nachdem du sie betrittst – nicht trödeln!');
+      L.hint(3, 0, -2.5, 3, 'crumble');
       for (let i = 0; i < 4; i++) { L.crumble(0, 0, -9 - i * 4); L.spark(0, 1.2, -9 - i * 4); }
       // Rotor-Plattform
       L.box(0, 0, -30, 8, 8, { mat: 'crystal' });
       L.checkpoint(-3, 0, -27);
       L.firebar(0, 0.75, -30, 3.6, 1.3, 4);
-      L.hint(3, 0, -27, 2.2, 'Ein Kristallrotor! Spring über die Glutkugeln.', false);
+      L.hint(3, 0, -27, 2.2, 'rotor', false);
       L.sparkRing(0, 2.2, -30, 2.5, 6);
       // Treppe
       L.box(0, 2, -38, 4, 4, { mat: 'crystal' });
@@ -98,7 +98,7 @@ export const LEVELS = [
       L.box(-5, 6, -78, 8, 8, { mat: 'crystal', decor: 'crystal' });
       L.checkpoint(-7.5, 6, -75);
       L.enemy('dornling', -5, 6, -79, { range: 2.5, axis: 'x' });
-      L.hint(-2.5, 6, -75, 2.2, 'Dornlinge sind zu stachelig zum Draufspringen. Die Drehattacke hilft!', false);
+      L.hint(-2.5, 6, -75, 2.2, 'dornling', false);
       L.heart(-8, 7, -81);
       // Aufzug
       L.mover({ from: [2.5, 6, -78], to: [2.5, 13, -78], w: 3, d: 3, period: 7, mat: 'stone' });
@@ -113,6 +113,15 @@ export const LEVELS = [
       L.enemy('flatterling', 9, 15, -101, { range: 2.5 });
       L.crystal(5.5, 15, -106.5, 0x8ff3ff, 2.2); L.crystal(12.5, 15, -106.5, 0xc59bff, 2.0);
       L.goalAt(9, 15, -105);
+      // Mutpfad
+      L.cyl(-14, 7, -78, 1.5, { mat: 'crystal', h: 14, under: false });
+      L.cyl(-19, 8.5, -80, 1.5, { mat: 'crystal', h: 14, under: false });
+      L.moonstone(-19, 10, -80, 0);
+      // Geisterplatten
+      L.ghost(16, 16, -103, 1.2); L.ghost(20, 17.5, -105, 1.2); L.ghost(24, 19, -103, 1.2);
+      L.moonstone(24, 20.5, -103, 1);
+      L.link([-8.4, 6, -78], [-14, 7, -78], { jump: 1 }); L.link([-15.3, 7, -78.5], [-19, 8.5, -80], { jump: 1 });
+      L.link([13.4, 15, -103], [16, 16, -103], { jump: 1 }); L.link([16.6, 16, -103.6], [20, 17.5, -105], { jump: 1 }); L.link([20.6, 17.5, -104.6], [24, 19, -103], { jump: 1 });
       // Kulisse: Kristallsäulen in der Tiefe
       for (let i = 0; i < 14; i++) {
         const x = (i % 2 ? 1 : -1) * (25 + (i * 7) % 20), z = 10 - i * 9;
@@ -127,16 +136,13 @@ export const LEVELS = [
   // ============================================================ 3
   {
     id: 'sky', name: 'Wolkenwerft', sub: 'Welt 3', music: 'sky', seed: 33,
-    theme: {
-      skyTop: 0x2f84e6, skyHorizon: 0xfff0d0, skyBottom: 0xffffff, fog: 0xf2f0ff, fogNear: 80, fogFar: 340,
-      hemiSky: 0xe8f4ff, hemiGround: 0xb0a080, hemiI: 1.8, sunI: 2.9, sunDir: [0.6, 0.7, -0.2], sea: 'cloudSea', seaY: -30,
-    },
     bouncerColor: 0xffb347, goalMat: 'metal', firebarColor: 0xff8a3c,
     build(L) {
+      L.par = 75;
       L.spawn(0, 0, 4, 0);
       L.box(0, 0, 0, 8, 12, { mat: 'wood' });
       L.airship(-14, 2, 4, 0.4);
-      L.hint(2.5, 0, -3, 3, 'Aufwinde tragen dich nach oben! Lauf hinein und steuere zur Plattform.');
+      L.hint(2.5, 0, -3, 3, 'updraft');
       L.updraft(0, -10, 2.5, -8, 14.5, 60);
       L.sparkLine([0, 2, -10], [0, 11, -10], 5);
       // Plattform A
@@ -170,52 +176,20 @@ export const LEVELS = [
       // Ziel
       L.box(17, 30, -96, 10, 10, { mat: 'wood' });
       L.goalAt(17, 30, -98);
+      // hoher Schatz
+      L.bouncer(19.5, 30, -73.5, 28);
+      L.cyl(24, 38, -73, 2, { mat: 'cloud', h: 1.2 });
+      L.moonstone(24, 39.5, -73, 0);
+      // Versteck unter dem Dock
+      L.cyl(0, -6, 10, 2.5, { mat: 'wood', h: 1.5 });
+      L.bouncer(-1, -6, 10.4, 30);
+      L.moonstone(1, -4.6, 9.6, 1);
+      L.link([19.5, 30.9, -73.5], [24, 38, -73], { via: [19.5, -73.5], viaY: 39 }); L.link([0, 0, 5.4], [1, -6, 9.6], {}); L.link([-1, -5.1, 10.4], [0, 0, 4], { via: [-1, 10.4], viaY: 3 });
       // Kulisse
       L.airship(30, 20, -30, -0.6); L.airship(-25, 30, -70, 0.9); L.airship(40, 40, -100, 2.5); L.airship(-10, 45, -120, 0.2);
       L.distantIsland(-40, 0, -20, 9); L.distantIsland(45, 10, -70, 8);
       L.clouds(16, 0, -50, 240, -20, 0);
       L.clouds(10, 0, -50, 240, 40, 60);
-    },
-  },
-  // ============================================================ 4
-  {
-    id: 'tower', name: 'Nebelturm', sub: 'Finale', music: 'tower', seed: 44, killY: -20,
-    theme: {
-      skyTop: 0x07040f, skyHorizon: 0x3d2560, skyBottom: 0x120a22, fog: 0x2a1a40, fogNear: 35, fogFar: 170,
-      hemiSky: 0xb0a0e0, hemiGround: 0x4a3a5a, hemiI: 2.2, sunI: 2.3, sunLight: 0xc8b8ff, sunColor: 0xd0c0ff, sunDir: [0.3, 0.8, 0.5],
-      sea: 'cloudSeaNight', seaY: -40, stars: 1.0,
-    },
-    goalMat: 'brick', crystalColor: 0xc59bff, pineColor: 0x2a3a4a, rockColor: 0x3a2a4a,
-    build(L) {
-      L.spawn(0, 0, 2, 0);
-      L.box(0, 0, 0, 8, 8, { mat: 'tower' });
-      L.hint(2.5, 0, -2, 3, 'Der Nebelturm. Ganz oben wartet Graf Nebelmaul …');
-      L.box(0, 2, -8, 4, 4, { mat: 'brick' });
-      L.box(5, 4, -12, 4, 4, { mat: 'brick' });
-      L.box(5, 6, -18, 4, 4, { mat: 'brick' });
-      L.box(0, 8, -22, 4, 4, { mat: 'brick' });
-      L.spark(0, 3, -8); L.spark(5, 5, -12); L.spark(5, 7, -18); L.spark(0, 9, -22);
-      L.box(0, 8, -30, 3, 8, { mat: 'brick', h: 1, under: false });
-      L.enemy('nebling', 0, 8, -30, { range: 2.5, axis: 'z' });
-      L.heart(0, 9.2, -27);
-      // Arena
-      L.cyl(0, 8, -48, 14, { mat: 'tower', h: 4 });
-      L.checkpoint(2.5, 8, -36);
-      L.hint(-2.5, 8, -36, 2.5, 'Wenn der Graf auf den Boden kracht, ist er benommen – spring auf seinen Kristall! Über die Schockwelle musst du springen.', false);
-      for (let i = 0; i < 8; i++) {
-        const a = i / 8 * Math.PI * 2 + 0.2;
-        if (Math.abs(Math.cos(a) * 12.5) < 3 && Math.sin(a) > 0) continue;
-        L.cyl(Math.cos(a) * 12.5, 11, -48 + Math.sin(a) * 12.5, 0.8, { mat: 'brick', h: 3, under: false });
-        L.crystal(Math.cos(a) * 12.5, 11, -48 + Math.sin(a) * 12.5, 0xc59bff, 0.8);
-      }
-      L.bossAt(0, 8, -48, 14);
-      // der Turm im Hintergrund
-      L.cyl(0, 30, -75, 9, { mat: 'tower', h: 60, under: false, noCollide: true });
-      L.cyl(0, 42, -75, 6, { mat: 'brick', h: 12, under: false, noCollide: true });
-      for (let i = 0; i < 6; i++) L.crystal(Math.cos(i) * 5, 42, -75 + Math.sin(i) * 5, 0xc59bff, 2);
-      L.distantIsland(-40, -5, -30, 8, { mat: 'tower', kind: 'pine', trees: 4 });
-      L.distantIsland(45, 5, -60, 10, { mat: 'tower', kind: 'pine', trees: 5 });
-      L.clouds(14, 0, -40, 220, -15, 0, 0x3d2a5c, 0.85);
     },
   },
 ];

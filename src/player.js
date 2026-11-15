@@ -48,7 +48,7 @@ export class Player {
   }
 
   stompBounce() {
-    this.vel.y = this.game.input.jumpHeld() ? 15 : 11;
+    this.vel.y = (this.game.input.jumpHeld() ? 15 : 11) * Math.sqrt(this.game.level.gravity);
     this.jumpsLeft = 1; this.airSpinUsed = false;
     this.pounding = false; this.poundWind = 0;
     this.fromBounce = true;
@@ -89,7 +89,9 @@ export class Player {
     const locked = this.controlLock > 0 || this.poundWind > 0 || this.pounding || this.poundLand > 0 || !this.alive;
     let targetX = 0, targetZ = 0;
     if (!locked && wl > 0.05) { targetX = wx * RUN; targetZ = wz * RUN; }
-    const acc = (this.grounded ? ACC_G : ACC_A) * dt;
+    const onIce = this.grounded && this.ground && this.ground.ice;
+    const acc = (this.grounded ? (onIce ? 9 : ACC_G) : ACC_A) * dt;
+    const gs = level.gravity, js = Math.sqrt(gs);
     if (!(this.controlLock > 0 && !this.grounded)) {
       const ax = targetX - this.vel.x, az = targetZ - this.vel.z, al = Math.hypot(ax, az);
       if (al > acc) { this.vel.x += ax / al * acc; this.vel.z += az / al * acc; } else { this.vel.x = targetX; this.vel.z = targetZ; }
@@ -107,12 +109,12 @@ export class Player {
     if (input.jumpPressed && this.alive) this.jumpBuffer = 0.13;
     if (this.jumpBuffer > 0 && !locked) {
       if (this.grounded || this.coyote > 0) {
-        this.vel.y = JUMP; this.grounded = false; this.ground = null; this.coyote = 0; this.jumpBuffer = 0;
+        this.vel.y = JUMP * js; this.grounded = false; this.ground = null; this.coyote = 0; this.jumpBuffer = 0;
         this.jumpsLeft = 1; this.fromBounce = false; this.squash = -0.3;
         this.game.audio.play('jump');
         this.game.particles.burst(this.pos, { count: 5, color: 0xffffff, speed: 2, size: 0.5, flat: true, life: 0.4 });
       } else if (this.jumpsLeft > 0 && input.jumpPressed) {
-        this.vel.y = JUMP2; this.jumpsLeft--; this.jumpBuffer = 0; this.flip = 1; this.fromBounce = false;
+        this.vel.y = JUMP2 * js; this.jumpsLeft--; this.jumpBuffer = 0; this.flip = 1; this.fromBounce = false;
         this.game.audio.play('jump2');
         this.game.particles.burst(this.pos, { count: 8, color: 0xffd58a, speed: 3, size: 0.4, tex: 'sparkle', additive: true, life: 0.5 });
       }
@@ -120,7 +122,7 @@ export class Player {
     // Drehattacke
     if (input.spinPressed && this.spinCd <= 0 && this.alive && !this.pounding && this.poundWind <= 0) {
       this.spinTime = 0.42; this.spinCd = 0.55;
-      if (!this.grounded && !this.airSpinUsed) { this.vel.y = Math.max(this.vel.y, 5.5); this.airSpinUsed = true; }
+      if (!this.grounded && !this.airSpinUsed) { this.vel.y = Math.max(this.vel.y, 5.5 * js); this.airSpinUsed = true; }
       this.game.audio.play('spin');
       this.game.particles.burst(new THREE.Vector3(this.pos.x, this.pos.y + 0.6, this.pos.z), { count: 10, color: 0x9ff0e8, speed: 6, size: 0.4, flat: true, life: 0.35, tex: 'sparkle', additive: true });
       level.spinHit(this);
@@ -137,7 +139,7 @@ export class Player {
 
     // Schwerkraft
     if (!this.pounding && this.poundWind <= 0) {
-      let g = GRAV;
+      let g = GRAV * gs;
       if (this.vel.y > 0 && !input.jumpHeld && !this.fromBounce) g *= 2.3;
       if (this.spinTime > 0 && this.vel.y < 0) g *= 0.35;
       this.vel.y += g * dt;
@@ -147,7 +149,7 @@ export class Player {
         if (this.vel.y > 10) this.vel.y = 10;
         this.jumpsLeft = 1; this.airSpinUsed = false; this.fromBounce = true;
       }
-      if (this.vel.y < MAXFALL) this.vel.y = MAXFALL;
+      if (this.vel.y < MAXFALL * js) this.vel.y = MAXFALL * js;
     }
 
     // ---- Vertikale Bewegung ----
@@ -173,7 +175,7 @@ export class Player {
       const impact = this.vel.y;
       this.grounded = true; this.ground = landed;
       if (landed.bounce) {
-        this.bounce(landed.bounce);
+        this.bounce(landed.bounce * js);
         const b = level.bouncers.find((o) => o.col === landed); if (b) b.t = 0.4;
       } else {
         this.vel.y = 0;

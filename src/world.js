@@ -4,12 +4,16 @@ import * as M from './models.js';
 import { rng } from './textures.js';
 import { boxCollider, cylCollider, moveCollider, overlapXZ } from './physics.js';
 import { Boss } from './boss.js';
+import { WORLDS } from './worlds.js';
+import { generateLevel } from './generator.js';
 
 const SURF = {
   grass: ['grass', 'dirt'], meadow: ['grassPlain', 'dirt'], stone: ['stone', 'stone'],
   crystal: ['crystalTop', 'crystalRock'], wood: ['wood', 'wood'], darkwood: ['darkWood', 'darkWood'],
   metal: ['metal', 'metal'], brick: ['brickTop', 'brick'], tower: ['brickTop', 'towerCliff'],
   sand: ['sand', 'dirt'], cloud: ['cloudSea', 'cloudSea'], checker: ['checker', 'wood'],
+  basalt: ['basaltTop', 'basalt'], snow: ['snow', 'snowCliff'], ice: ['ice', 'ice'], sandstone: ['sandTop', 'sandstone'],
+  coral: ['coral', 'seaRock'], sea: ['seaRock', 'seaRock'], clock: ['clockTop', 'brick'],
 };
 
 function planarUV(geo, ox, oy, oz, tile) {
@@ -59,9 +63,17 @@ void main(){ vec3 d = normalize(vDir); float h = d.y; vec3 c = h > 0.0 ? mix(hor
  gl_FragColor = vec4(c, 1.0); }`;
 
 export class Level {
-  constructor(def, game) {
-    this.def = def;
+  constructor(spec, game) {
+    this.spec = spec;
+    const W = WORLDS[spec.world];
+    this.worldDef = W;
+    const theme = spec.star ? { ...W.theme, stars: 1, skyTop: 0x0a0820, fogFar: W.theme.fogFar * 0.8, hemiI: (W.theme.hemiI || 1.6) * 0.9 } : W.theme;
+    const def = this.def = { ...W.style, theme, seed: spec.seed, killY: W.killY };
     this.game = game;
+    this.gravity = W.gravity || 1;
+    this.links = [];
+    this.blinks = []; this.geysers = []; this.ghosts = []; this.moonstones = []; this.keyItem = null;
+    this.freeze = false;
     this.T = game.T;
     this.group = new THREE.Group();
     this.colliders = [];
@@ -77,7 +89,9 @@ export class Level {
     this.sparkTotal = 0;
     this.mats = {};
     this.setupEnvironment();
-    def.build(this);
+    if (spec.build) spec.build(this);
+    else generateLevel(this, spec);
+    this.par = this.par || 60;
   }
 
   surf(name) {
@@ -116,6 +130,13 @@ export class Level {
     const sc = sun.shadow.camera; sc.left = sc.bottom = -28; sc.right = sc.top = 28; sc.near = 1; sc.far = 120;
     sun.shadow.bias = -0.0008; sun.shadow.normalBias = 0.03;
     this.sun = sun; this.add(sun); this.add(sun.target);
+    if (th.lavaY !== undefined) {
+      const tex = this.T.lava.clone(); tex.needsUpdate = true; tex.repeat.set(80, 80);
+      const lava = new THREE.Mesh(new THREE.PlaneGeometry(3000, 3000), new THREE.MeshBasicMaterial({ map: tex }));
+      lava.rotation.x = -Math.PI / 2; lava.position.y = th.lavaY;
+      this.add(lava); this.seaTex = tex; this.lavaFlow = true;
+      this.killY = th.lavaY - 0.5;
+    }
     // Wolkenmeer
     if (th.sea) {
       const tex = this.T[th.sea].clone(); tex.needsUpdate = true;
@@ -151,7 +172,7 @@ export class Level {
       um.position.set(x, top - h - uh / 2, z);
       this.add(um);
     }
-    const c = boxCollider(x - w / 2, top - h, z - d / 2, x + w / 2, top, z + d / 2, { mesh: m });
+    const c = boxCollider(x - w / 2, top - h, z - d / 2, x + w / 2, top, z + d / 2, { mesh: m, ice: !!o.ice });
     if (!o.noCollide) this.colliders.push(c);
     if (!o.noCam) this.cameraMeshes.push(m);
     if (o.decor) this.scatter(c, o.decor);
@@ -175,14 +196,20 @@ export class Level {
       um.position.set(x, top - h - uh / 2, z);
       this.add(um);
     }
-    const c = cylCollider(x, z, r, top - h, top, { mesh: m });
+    const c = cylCollider(x, z, r, top - h, top, { mesh: m, ice: !!o.ice });
     if (!o.noCollide) this.colliders.push(c);
-    this.cameraMeshes.push(m);
+    if (!o.noCam) this.cameraMeshes.push(m);
     if (o.decor) this.scatter(c, o.decor);
     return { mesh: m, col: c };
   }
 
   mover(o) {
+    if (o.circle) {
+      const C = o.circle;
+      const a0 = C.phase || 0;
+      o.from = [C.cx + Math.cos(a0) * C.R, C.cy, C.cz + Math.sin(a0) * C.R];
+      o.to = o.from;
+    }
     const from = new THREE.Vector3(...o.from), to = new THREE.Vector3(...o.to);
     const h = o.h ?? 0.8;
     let p;
@@ -191,8 +218,10 @@ export class Level {
     // kleine Laternen-Markierung, damit man bewegte Plattformen erkennt
     const gem = new THREE.Mesh(new THREE.OctahedronGeometry(0.22), M.toon(0xffe066, { emissive: 0xffb000, ei: 0.6 }));
     gem.position.set(0, h / 2 + 0.05, 0); gem.scale.y = 0.5; p.mesh.add(gem);
-    this.movers.push({ ...p, from, to, period: o.period ?? 5, phase: (o.phase ?? 0) * (o.period ?? 5), pos: from.clone() });
-    return p;
+    const mv = { ...p, from, to, period: o.period ?? 5, phase: (o.phase ?? 0) * (o.period ?? 5), pos: from.clone(), circle: o.circle || null };
+    if (o.circle) mv.angle = o.circle.phase || 0;
+    this.movers.push(mv);
+    return mv;
   }
 
   crumble(x, top, z, w = 3, d = 3) {
@@ -206,6 +235,26 @@ export class Level {
     return p;
   }
 
+  crumbleCyl(x, top, z, r) {
+    const p = this.cyl(x, top, z, r, { mat: this.def.crumbleMat || 'stone', h: 0.7, under: false, noCam: true });
+    p.mesh.material = p.mesh.material.map((m) => { const c = m.clone(); c.color = new THREE.Color(0xffd0a0); return c; });
+    const crack = new THREE.Mesh(new THREE.BoxGeometry(r * 1.6, 0.05, 0.08), M.toon(0x2a1a10));
+    crack.position.y = 0.36; crack.rotation.y = 0.6; p.mesh.add(crack);
+    this.crumbles.push({ ...p, home: p.mesh.position.clone(), state: 'idle', t: 0 });
+    return p;
+  }
+
+  // Test-Helfer: Mover an eine bestimmte Stelle setzen
+  setMover(mi, o) {
+    const mv = this.movers[mi];
+    let nx, ny, nz;
+    if (mv.circle) { mv.angle = o.angle; nx = mv.circle.cx + Math.cos(o.angle) * mv.circle.R; ny = mv.circle.cy; nz = mv.circle.cz + Math.sin(o.angle) * mv.circle.R; }
+    else { const e = o.at ? mv.to : mv.from; nx = e.x; ny = e.y; nz = e.z; mv.phase = o.at ? mv.period / 2 : 0; }
+    const dx = nx - mv.pos.x, dy = ny - mv.pos.y, dz = nz - mv.pos.z;
+    mv.pos.set(nx, ny, nz); moveCollider(mv.col, dx, dy, dz); mv.col.dx = mv.col.dy = mv.col.dz = 0;
+    mv.mesh.position.x += dx; mv.mesh.position.y += dy; mv.mesh.position.z += dz;
+  }
+
   bouncer(x, top, z, strength = 23) {
     const m = M.createBouncer(this.def.bouncerColor);
     m.position.set(x, top, z);
@@ -214,6 +263,54 @@ export class Level {
     this.colliders.push(c);
     this.bouncers.push({ mesh: m, col: c, t: 0 });
   }
+
+  blink(x, top, z, r, group = 0, period = 4) {
+    const p = this.cyl(x, top, z, r, { mat: this.def.blinkMat || 'clock', h: 0.6, under: false, noCam: true });
+    const col = group ? 0x6ad5ff : 0xff7ab8;
+    const mat = M.toon(col, { emissive: col, ei: 0.35, transparent: true, opacity: 1, unique: true });
+    p.mesh.material = mat;
+    this.blinks.push({ ...p, group, period, mat });
+    return p;
+  }
+
+  geyser(x, top, z, phase = 0, period = 4) {
+    const base = new THREE.Mesh(new THREE.CylinderGeometry(0.9, 1.1, 0.25, 12), M.toon(0x2a1c1c, { map: this.T.basalt }));
+    base.position.set(x, top + 0.1, z); this.add(base);
+    const col = new THREE.Mesh(new THREE.CylinderGeometry(0.7, 0.9, 6, 12, 1, true), M.basic(0xff8a2a, { transparent: true, opacity: 0.75, additive: true, side: THREE.DoubleSide }));
+    col.position.set(x, top + 3, z); col.visible = false; this.add(col);
+    this.geysers.push({ x, z, top, phase, period, col, base, state: 'idle' });
+  }
+
+  ghost(x, top, z, r) {
+    const p = this.cyl(x, top, z, r, { mat: 'cloud', h: 0.5, under: false, noCam: true });
+    const mat = new THREE.MeshToonMaterial({ color: 0xe8f0ff, emissive: 0x6a8aff, emissiveIntensity: 0.4, gradientMap: this.T.toonGradient, transparent: true, opacity: 0.0 });
+    p.mesh.material = mat; p.mesh.castShadow = false;
+    this.ghosts.push({ ...p, mat, x, y: top, z, vis: 0 });
+    return p;
+  }
+
+  moonstone(x, y, z, idx) {
+    const got = this.game.hasMoonstone(this.spec, idx);
+    const m = M.createMoonstone(got);
+    m.position.set(x, y, z); this.add(m);
+    const ms = { mesh: m, pos: m.position, idx, taken: false, base: y };
+    this.moonstones.push(ms);
+    return ms;
+  }
+
+  keyAt(x, y, z) {
+    if (this.game.hasKey(this.spec.world)) return;
+    const k = M.createKey(); k.position.set(x, y, z); this.add(k);
+    this.keyItem = { mesh: k, pos: k.position, taken: false, base: y };
+  }
+
+  spawnSparkMoonstone(p) {
+    if (this.moonstones.some((m) => m.idx === 2)) return;
+    const ms = this.moonstone(p.x, p.y + 2.6, p.z, 2);
+    this.game.particles.burst(ms.pos, { count: 20, color: [0x9ab8ff, 0xffffff], speed: 5, size: 0.7, tex: 'sparkle', additive: true });
+  }
+
+  link(a, b, o = {}) { this.links.push({ a, b, o }); }
 
   // ---------------- Sammelobjekte ----------------
   spark(x, y, z) {
@@ -270,9 +367,10 @@ export class Level {
   // ---------------- Gegner & Fallen ----------------
   enemy(type, x, top, z, o = {}) {
     let mesh;
-    if (type === 'nebling') mesh = M.createNebling();
-    else if (type === 'dornling') mesh = M.createDornling();
-    else mesh = M.createFlatterling();
+    const tint = (this.def.tints || {})[type];
+    if (type === 'nebling') mesh = M.createNebling(tint);
+    else if (type === 'dornling') mesh = M.createDornling(tint);
+    else mesh = M.createFlatterling(tint);
     mesh.position.set(x, top, z);
     this.add(mesh);
     const e = {
@@ -320,12 +418,14 @@ export class Level {
   }
 
   bossAt(x, top, z, arenaR) {
-    this.boss = new Boss(this, x, top, z, arenaR);
+    this.boss = new Boss(this, x, top, z, arenaR, this.worldDef.boss);
   }
 
   // ---------------- Deko ----------------
   tree(x, top, z, kind = 'round', collide = true) {
-    const t = kind === 'pine' ? M.createPine(this.rand, this.def.pineColor) : M.createTree(this.rand, kind);
+    const t = kind === 'pine' ? M.createPine(this.rand, this.def.pineColor) : kind === 'palm' ? M.createPalm(this.rand)
+      : kind === 'coral' ? M.createCoralPlant(this.rand) : kind === 'snowman' ? M.createSnowman(this.rand) : kind === 'crystal' ? M.createCrystal(this.rand, this.def.crystalColor) : M.createTree(this.rand, kind);
+    if (kind === 'coral') t.scale.setScalar(2.2);
     t.position.set(x, top, z); t.rotation.y = this.rand() * 6;
     this.add(t);
     if (collide) this.colliders.push(cylCollider(x, z, 0.35, top, top + 2.5));
@@ -347,6 +447,8 @@ export class Level {
       if (kind === 'meadow') o = this.rand() < 0.5 ? M.createFlower(this.rand) : M.createGrassTuft(this.rand);
       else if (kind === 'grass') o = M.createGrassTuft(this.rand, this.def.tuftColor);
       else if (kind === 'crystal') { if (this.rand() < 0.75) continue; o = M.createCrystal(this.rand, this.def.crystalColor); o.scale.setScalar(0.35); }
+      else if (kind === 'coral') { if (this.rand() < 0.6) continue; o = M.createCoralPlant(this.rand); }
+      else if (kind === 'rocks') { if (this.rand() < 0.85) continue; o = M.createRock(this.rand, this.def.rockColor); o.scale.setScalar(0.4); }
       else continue;
       o.position.set(x, c.maxY, z);
       o.rotation.y = this.rand() * 6;
@@ -367,6 +469,9 @@ export class Level {
       let t;
       if (kind === 'crystal') t = M.createCrystal(this.rand, this.def.crystalColor);
       else if (kind === 'pine') t = M.createPine(this.rand, this.def.pineColor);
+      else if (kind === 'palm') t = M.createPalm(this.rand);
+      else if (kind === 'coral') t = M.createCoralPlant(this.rand);
+      else if (kind === 'none') continue;
       else t = M.createTree(this.rand, this.rand() < 0.3 ? 'blossom' : kind);
       t.position.set(x + Math.cos(a) * rr, y + r * 0.175, z + Math.sin(a) * rr);
       t.scale.setScalar(r / 5 + 0.5);
@@ -383,6 +488,12 @@ export class Level {
       this.add(c);
       this.anim.push({ kind: 'drift', obj: c, sp: 0.3 + this.rand() * 0.6, x0: cx - spread / 2, x1: cx + spread / 2 });
     }
+  }
+
+  gear(x, y, z, r, speed = 0.3, yaw = 0) {
+    const g = M.createGear(r, this.def.gearColor);
+    g.position.set(x, y, z); g.rotation.y = yaw; this.add(g);
+    this.anim.push({ kind: 'spin', obj: g, sp: speed });
   }
 
   airship(x, y, z, yaw = 0) {
@@ -412,9 +523,16 @@ export class Level {
   stepWorld(dt) {
     this.time += dt;
     for (const mv of this.movers) {
+      if (this.freeze) { mv.col.dx = mv.col.dy = mv.col.dz = 0; continue; }
       mv.phase += dt;
-      const t = (1 - Math.cos(mv.phase / mv.period * Math.PI * 2)) / 2;
-      const nx = mv.from.x + (mv.to.x - mv.from.x) * t, ny = mv.from.y + (mv.to.y - mv.from.y) * t, nz = mv.from.z + (mv.to.z - mv.from.z) * t;
+      let nx, ny, nz;
+      if (mv.circle) {
+        mv.angle += dt * mv.circle.speed;
+        nx = mv.circle.cx + Math.cos(mv.angle) * mv.circle.R; ny = mv.circle.cy; nz = mv.circle.cz + Math.sin(mv.angle) * mv.circle.R;
+      } else {
+        const t = (1 - Math.cos(mv.phase / mv.period * Math.PI * 2)) / 2;
+        nx = mv.from.x + (mv.to.x - mv.from.x) * t; ny = mv.from.y + (mv.to.y - mv.from.y) * t; nz = mv.from.z + (mv.to.z - mv.from.z) * t;
+      }
       const dx = nx - mv.pos.x, dy = ny - mv.pos.y, dz = nz - mv.pos.z;
       mv.pos.set(nx, ny, nz);
       moveCollider(mv.col, dx, dy, dz);
@@ -442,6 +560,16 @@ export class Level {
         cr.mesh.scale.setScalar(Math.min(1, cr.grow));
         if (cr.grow >= 1) cr.grow = undefined;
       }
+    }
+    for (const b of this.blinks) {
+      const per = b.period, t = ((this.time + b.group * per / 2) % per) / per; // 0..1
+      const on = this.freeze || t < 0.5;
+      b.col.disabled = !on;
+      b.warn = !this.freeze && t > 0.38 && t < 0.5;
+    }
+    for (const gz of this.geysers) {
+      const t = (this.time + gz.phase) % gz.period;
+      gz.state = this.freeze ? 'idle' : t < gz.period - 1.9 ? 'idle' : t < gz.period - 1.2 ? 'warn' : 'erupt';
     }
     for (const c of this.colliders) if (!c.dynamic) { c.dx = c.dy = c.dz = 0; }
     for (const mv of this.movers) mv.col.dynamic = true;
@@ -495,6 +623,17 @@ export class Level {
         b.getWorldPosition(wp);
         if (wp.distanceToSquared(pc) < 0.75 * 0.75 + 0.2) { player.hurt(wp); break; }
       }
+    }
+    for (const ms of this.moonstones) {
+      if (ms.taken) continue;
+      if (ms.pos.distanceToSquared(pc) < 1.6) { ms.taken = true; ms.mesh.visible = false; g.collectMoonstone(ms.idx, ms.pos); }
+    }
+    if (this.keyItem && !this.keyItem.taken && this.keyItem.pos.distanceToSquared(pc) < 1.6) {
+      this.keyItem.taken = true; this.keyItem.mesh.visible = false; g.collectKey(this.keyItem.pos);
+    }
+    for (const gz of this.geysers) {
+      if (gz.state !== 'erupt') continue;
+      if (Math.hypot(p.x - gz.x, p.z - gz.z) < 1.1 && p.y < gz.top + 6 && p.y > gz.top - 1) player.hurt(new THREE.Vector3(gz.x, gz.top, gz.z + 0.01));
     }
     // Projektile
     for (const pr of this.projectiles) pr.check && pr.check(player);
@@ -556,7 +695,34 @@ export class Level {
     }
     for (const fb of this.firebars) fb.piv.rotation.y = t * fb.speed;
     for (const u of this.updrafts) { u.tex.offset.y -= dt * 1.5; if (Math.random() < dt * 8) this.game.particles.burst(new THREE.Vector3(u.x + (Math.random() - 0.5) * u.r * 1.5, u.y0 + 0.5, u.z + (Math.random() - 0.5) * u.r * 1.5), { count: 1, color: 0xffffff, speed: 0.1, gravity: 14, life: 1.8, size: 0.35, drag: 0 }); }
-    if (this.seaTex) { this.seaTex.offset.x += dt * 0.004; this.seaTex.offset.y += dt * 0.002; }
+    if (this.seaTex) { const k = this.lavaFlow ? 3 : 1; this.seaTex.offset.x += dt * 0.004 * k; this.seaTex.offset.y += dt * 0.002 * k; }
+    const th = this.def.theme;
+    if ((th.snow || th.bubbles) && Math.random() < dt * 25) {
+      const p = player.pos;
+      const pos = new THREE.Vector3(p.x + (Math.random() - 0.5) * 30, p.y + (th.snow ? 12 : -6), p.z + (Math.random() - 0.5) * 30);
+      this.game.particles.burst(pos, th.snow
+        ? { count: 1, color: 0xffffff, speed: 0.3, size: 0.25, gravity: -1.2, life: 6, drag: 0 }
+        : { count: 1, color: 0xbff8ff, speed: 0.3, size: 0.3, gravity: 1.5, life: 6, drag: 0, opacity: 0.6 });
+    }
+    for (const ms of this.moonstones) if (!ms.taken) { ms.mesh.rotation.y = t * 2; ms.pos.y = ms.base + Math.sin(t * 2.2) * 0.15; }
+    if (this.keyItem && !this.keyItem.taken) { this.keyItem.mesh.rotation.y = t * 2.5; this.keyItem.pos.y = this.keyItem.base + Math.sin(t * 3) * 0.15; }
+    for (const b of this.blinks) {
+      const on = !b.col.disabled;
+      b.mat.opacity = on ? (b.warn ? 0.5 + Math.sin(t * 40) * 0.4 : 1) : 0.15;
+      b.mesh.scale.y = on ? 1 : 0.3;
+    }
+    for (const gz of this.geysers) {
+      gz.col.visible = gz.state === 'erupt';
+      if (gz.state === 'erupt') { gz.col.scale.set(1 + Math.sin(t * 30) * 0.1, 1, 1 + Math.cos(t * 30) * 0.1); if (Math.random() < dt * 20) this.game.particles.burst(new THREE.Vector3(gz.x, gz.top + 5, gz.z), { count: 1, color: [0xffc23a, 0xff5a1a], speed: 3, size: 0.6, tex: 'glow', additive: true, gravity: -6 }); }
+      if (gz.state === 'warn' && Math.random() < dt * 15) this.game.particles.burst(new THREE.Vector3(gz.x, gz.top + 0.3, gz.z), { count: 1, color: 0xff8a2a, speed: 2, size: 0.4, tex: 'glow', additive: true, gravity: 2, life: 0.5 });
+    }
+    for (const gh of this.ghosts) {
+      const d = Math.hypot(player.pos.x - gh.x, player.pos.y - gh.y, player.pos.z - gh.z);
+      const tgt = d < 6 ? 0.85 : 0.0;
+      gh.vis += (tgt - gh.vis) * Math.min(1, dt * 3);
+      gh.mat.opacity = Math.max(gh.vis, 0.03 + Math.sin(t * 2 + gh.x) * 0.02);
+      if (Math.random() < dt * 0.6) this.game.particles.burst(new THREE.Vector3(gh.x + (Math.random() - 0.5) * gh.col.r, gh.y + 0.3, gh.z), { count: 1, color: 0xbfd0ff, speed: 0.3, size: 0.3, tex: 'sparkle', additive: true, gravity: 0.5, life: 1.2 });
+    }
     if (this.goal && !this.goal.taken) {
       this.goal.mesh.rotation.y = t * 1.2;
       this.goal.mesh.position.y += Math.sin(t * 2) * 0.004;
@@ -566,6 +732,7 @@ export class Level {
     for (const a of this.anim) {
       if (a.kind === 'bob') { const dy = Math.sin(t * a.sp + a.ph) * a.amp; a.obj.position.y = a.base + dy; a.other.position.y = a.obase + dy; }
       else if (a.kind === 'drift') { a.obj.position.x += a.sp * dt; if (a.obj.position.x > a.x1) a.obj.position.x = a.x0; }
+      else if (a.kind === 'spin') a.obj.rotation.z += a.sp * dt;
       else if (a.kind === 'ship') { a.obj.position.y = a.base + Math.sin(t * 0.6 + a.ph) * 0.8; a.obj.userData.prop.rotation.x = t * 12; a.obj.rotation.z = Math.sin(t * 0.5 + a.ph) * 0.04; }
     }
     if (this.lighthouseObj) this.lighthouseObj.userData.lamp.material.color.set(this.game.lighthouseLit ? 0xfff3a0 : 0x3b3150);
@@ -630,7 +797,7 @@ export class Level {
   checkpointHint(player) {
     for (const h of this.hints) {
       const dx = player.pos.x - h.x, dz = player.pos.z - h.z;
-      if (dx * dx + dz * dz < h.r * h.r && Math.abs(player.pos.y - h.y) < 4) return h.text;
+      if (dx * dx + dz * dz < h.r * h.r && Math.abs(player.pos.y - h.y) < 4) return this.game.t('hints.' + h.text);
     }
     return null;
   }

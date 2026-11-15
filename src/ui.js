@@ -7,7 +7,7 @@ export class HUD {
     this.el = {
       hud: $('#hud'), hearts: $('#hearts'), lives: $('#lives'), sparks: $('#sparks'), shards: $('#shards'),
       hint: $('#hint'), toast: $('#toast'), banner: $('#banner'), boss: $('#bossbar'), screen: $('#screen'),
-      dialog: $('#dialog'), fade: $('#fade'), timer: $('#timer'),
+      dialog: $('#dialog'), fade: $('#fade'), timer: $('#timer'), moons: $('#moons'),
     };
     this.menu = null;
     this.dlg = null;
@@ -33,8 +33,13 @@ export class HUD {
   }
   setShards(n) {
     let h = '';
-    for (let i = 0; i < 3; i++) h += `<span class="shard ${i < n ? 'full' : ''}"></span>`;
+    for (let i = 0; i < 7; i++) h += `<span class="shard ${i < n ? 'full' : ''}"></span>`;
     this.el.shards.innerHTML = h;
+  }
+  setMoons(arr) {
+    if (!arr) { this.el.moons.style.display = 'none'; return; }
+    this.el.moons.style.display = '';
+    this.el.moons.innerHTML = arr.map((v) => `<span class="moon ${v ? 'full' : ''}"></span>`).join('');
   }
   setTimer(t) {
     const m = Math.floor(t / 60), s = Math.floor(t % 60);
@@ -82,15 +87,16 @@ export class HUD {
   }
 
   // ---------- Menüs ----------
-  showMenu({ title = '', subtitle = '', body = '', items = [], cls = '' }) {
+  showMenu({ title = '', subtitle = '', body = '', items = [], cls = '', onLeft = null, onRight = null, sel = null }) {
     const s = this.el.screen;
     s.className = 'show ' + cls;
     s.innerHTML = `<div class="panel">${title ? `<div class="title">${title}</div>` : ''}${subtitle ? `<div class="subtitle">${subtitle}</div>` : ''}${body ? `<div class="body">${body}</div>` : ''}<div class="items"></div></div>`;
     const box = s.querySelector('.items');
-    this.menu = { items, sel: items.findIndex((i) => !i.disabled), buttons: [] };
+    this.menu = { items, sel: sel ?? items.findIndex((i) => !i.disabled), buttons: [], onLeft, onRight };
     items.forEach((it, i) => {
       const b = document.createElement('button');
-      b.textContent = it.label; b.disabled = !!it.disabled;
+      if (it.html) b.innerHTML = it.html; else b.textContent = it.label;
+      b.disabled = !!it.disabled;
       b.addEventListener('click', () => { this.audio.init(); this.audio.play('confirm'); it.action(); });
       b.addEventListener('mouseenter', () => { if (!it.disabled) { this.menu.sel = i; this.refreshSel(); } });
       box.appendChild(b); this.menu.buttons.push(b);
@@ -116,6 +122,8 @@ export class HUD {
     if (p.has('ArrowUp') || p.has('KeyW') || pad.up) move(-1);
     if (input.pad && !this.padHeld && Math.abs(input.pad.ly) > 0.6) { move(Math.sign(input.pad.ly)); this.padHeld = true; }
     if (input.pad && Math.abs(input.pad.ly) < 0.3) this.padHeld = false;
+    if (this.menu.onLeft && (p.has('ArrowLeft') || p.has('KeyA') || p.has('KeyQ'))) { this.menu.onLeft(); return true; }
+    if (this.menu.onRight && (p.has('ArrowRight') || p.has('KeyD') || p.has('KeyE'))) { this.menu.onRight(); return true; }
     if (p.has('Enter') || p.has('Space') || pad.confirm) {
       const it = this.menu.items[this.menu.sel];
       if (it && !it.disabled) { this.audio.init(); this.audio.play('confirm'); it.action(); }
@@ -135,7 +143,7 @@ export class HUD {
     const l = this.dlgLines.shift();
     if (!l) { this.el.dialog.classList.remove('show'); this.dlg = null; const cb = this.dlgDone; this.dlgDone = null; cb && cb(); return; }
     this.el.dialog.querySelector('.who').textContent = l.who;
-    this.el.dialog.dataset.who = l.who;
+    this.el.dialog.dataset.who = l.role || l.who;
     this.el.dialog.querySelector('.text').textContent = '';
     this.dlg = { full: l.text, t: 0, shown: 0, done: false };
   }

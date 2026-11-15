@@ -11,16 +11,40 @@ aus Grundformen gebaut und Musik und Soundeffekte live mit der WebAudio-API synt
 
 ## Story
 
-Hoch über dem Wolkenmeer schweben die Inseln von **Lumeria**. Graf Nebelmaul hat das *Morgenlicht*, den Kristall
-auf dem alten Leuchtturm, zerschlagen. Aus dem letzten Funken erwacht **Lumi**, ein kleiner Laternengeist. Begleitet von
-der Stimme der Leuchtturmwärterin **Elva** holt Lumi die drei Splitter zurück und stellt den Grafen in seinem Turm.
+Hoch über dem Wolkenmeer schweben die Inseln von **Lumeria**. Graf Nebelmaul hat das *Morgenlicht*, den Kristall auf dem
+alten Leuchtturm, in sieben Splitter zerschlagen und jedem seiner Nebelfürsten einen gegeben. Den Kern behält er selbst.
+Aus dem letzten Funken erwacht **Lumi**, ein kleiner Laternengeist. Die Stimme der Leuchtturmwärterin **Elva** führt Lumi durch acht Welten.
 
-| Welt | Name | Neue Elemente |
-|---|---|---|
-| 1 | Blütenwiesen | Neblinge, Sprungblüten, bewegliche Plattformen, Säulen-Parcours |
-| 2 | Kristallschlucht | Bröckelplatten, Kristallrotoren, Dornlinge, Aufzug |
-| 3 | Wolkenwerft | Aufwinde, Flatterlinge, Planke mit Rotor |
-| 4 | Nebelturm | Bosskampf gegen Graf Nebelmaul (3 Phasen) |
+**Sprachen:** Deutsch, English, Français, Español, Italiano, Türkçe. Story, Menüs und Hinweise sind komplett übersetzt.
+Die Sprache wird automatisch erkannt und ist im Hauptmenü und im Pausenmenü umschaltbar.
+
+## Inhalt
+
+| Welt | Thema | Besonderheiten | Boss |
+|---|---|---|---|
+| 1 | Blütenwiesen | Sprungblüten, bewegliche Plattformen | Moderich der Welke |
+| 2 | Kristallschlucht | Bröckelplatten, Kristallrotoren, Aufzüge | Splitterzahn |
+| 3 | Wolkenwerft | Aufwinde, Luftschiffe, kreisende Plattformen | Kapitän Dunstbart |
+| 4 | Glutvulkan | Lavasee, Feuergeysire | Schwelgrimm |
+| 5 | Frostgipfel | rutschiges Eis, Blinkplatten | Frierich der Eisige |
+| 6 | Sonnenruinen | Säulen, Sonnenplatten im Takt | Der Sandflüsterer |
+| 7 | Korallentiefe | geringe Schwerkraft, Blasenströme, Quallen | Tiefenschlund |
+| 8 | Nebelreich | Uhrwerk, alles gemischt, Finale | Graf Nebelmaul |
+
+- **Pro Welt 7 Level:** 5 normale Level, ein Bosslevel und ein geheimes Bonuslevel. Insgesamt sind das **56 Level**.
+- **Sternenpfade (nach dem Finale):** 56 weitere, schwerere Nachtversionen mit eigenen Geheimnissen und stärkeren Bossen. Insgesamt sind das **112 Level**.
+- **Geheimnisse pro Level:** 3 Mondsteine (Mutpfad, Versteck und alle Funken). Verstecke sind unsichtbare Geisterplatten, Höhlen unter der Startinsel oder hohe Wolkenschätze.
+  Dazu kommt ein **Geheimschlüssel** pro Welt (öffnet das Bonuslevel) und eine **Zeitmedaille** pro Level.
+- **288 Mondsteine** insgesamt (144 je Modus). Neue Welten brauchen eine Mindestzahl an Mondsteinen.
+- **Spielzeit:** Für alle Geheimnisse in beiden Modi rechne ich mit über 20 Stunden. Das ist eine Schätzung, kein Messwert, und hängt stark vom Spieler ab.
+
+Die ersten Level der Welten 1–3 sind handgebaut. Alle anderen baut ein **Level-Generator** (`src/generator.js`) aus Bausteinen
+wie Sprungreihen, Treppen, Fahrstühlen, Aufwinden, Blinkplatten, Geysirfeldern und Brücken, mit festem Seed. Jedes Level ist also immer gleich, aber jedes ist anders.
+
+## Qualitätssicherung
+
+Der Generator notiert jeden Sprung des Levels, auch die Wege zu allen Geheimnissen. Ein Test-Bot springt jeden einzelnen davon mit
+der echten Spielphysik nach (`__lumi.debugTestLevel(welt, level)` in der Browser-Konsole). Aktueller Stand: **3095 von 3095 Sprüngen in 112 Leveln sind schaffbar.**
 
 ## Steuerung
 
@@ -36,7 +60,7 @@ der Stimme der Leuchtturmwärterin **Elva** holt Lumi die drei Splitter zurück 
 
 Auf Handy und Tablet erscheinen Touch-Steuerelemente (Stick links, Knöpfe rechts, Kamera durch Wischen).
 
-Fortschritt wird im Browser gespeichert (`localStorage`). Mit `lumi.html?level=2` startet man direkt in einer Welt (zum Testen).
+Fortschritt wird im Browser gespeichert (`localStorage`). Mit `lumi.html?w=4&l=0` startet man direkt in ein Level (Welt 5, Level 1; zum Testen).
 
 ## Entwickeln
 
@@ -50,12 +74,14 @@ npm run build   # erzeugt game.js, index.html und lumi.html aus src/
 | `src/main.js` | Spielablauf, Zustände, Kamera, Hauptschleife |
 | `src/player.js` | Lumis Steuerung, Physik, Animation |
 | `src/world.js` | Level-Bausteine (Plattformen, Gegner, Fallen, Deko) |
-| `src/levels.js` | Level-Design der 4 Welten |
-| `src/boss.js` | Graf Nebelmaul |
+| `src/worlds.js` | die 8 Welten: Farben, Mechaniken, Gegner, Bosse |
+| `src/generator.js` | prozeduraler Level-Generator inkl. Geheimnisse |
+| `src/levels.js` | handgebaute Level |
+| `src/boss.js` | Bosse (parametrisiert pro Welt) |
+| `src/i18n/` | alle Texte in 6 Sprachen |
 | `src/models.js` | alle 3D-Modelle |
 | `src/textures.js` | prozedurale Texturen |
 | `src/audio.js` | Synthesizer, Soundeffekte und komponierte Musikstücke |
-| `src/story.js` | alle Dialoge |
 | `src/ui.js`, `src/style.css` | HUD, Menüs, Dialogboxen |
 
 Engine: [three.js](https://threejs.org) (MIT). Gebündelt mit esbuild.

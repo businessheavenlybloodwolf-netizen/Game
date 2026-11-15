@@ -122,10 +122,10 @@ function eyes(parent, y, z, spread, size, color = 0xffe14a) {
   }
 }
 
-export function createNebling() {
+export function createNebling(tint) {
   const root = new THREE.Group();
   const body = new THREE.Group(); root.add(body);
-  const m = toon(0x8f72c8, { map: T.fog });
+  const m = toon(tint ?? 0x8f72c8, { map: T.fog });
   const b = mesh(new THREE.SphereGeometry(0.6, 20, 14), m, 0, 0.55, 0, body); b.scale.set(1, 0.9, 1);
   const top = mesh(new THREE.SphereGeometry(0.28, 12, 10), m, 0.1, 1.05, -0.05, body);
   eyes(body, 0.68, 0.52, 0.2, 0.1);
@@ -142,10 +142,10 @@ export function createNebling() {
   return root;
 }
 
-export function createDornling() {
+export function createDornling(tint) {
   const root = new THREE.Group();
   const body = new THREE.Group(); root.add(body);
-  const m = toon(0xb0364f);
+  const m = toon(tint ?? 0xb0364f);
   const b = mesh(new THREE.SphereGeometry(0.55, 20, 14), m, 0, 0.6, 0, body);
   const spikeM = toon(0xffe9c4);
   const cone = new THREE.ConeGeometry(0.12, 0.42, 8);
@@ -166,10 +166,10 @@ export function createDornling() {
   return root;
 }
 
-export function createFlatterling() {
+export function createFlatterling(tint) {
   const root = new THREE.Group();
   const body = new THREE.Group(); root.add(body);
-  const m = toon(0x5b3f8f, { map: T.fog });
+  const m = toon(tint ?? 0x5b3f8f, { map: T.fog });
   const b = mesh(new THREE.SphereGeometry(0.45, 18, 12), m, 0, 0, 0, body);
   eyes(body, 0.08, 0.4, 0.16, 0.08);
   const wingM = toon(0x9a7fd1);
@@ -187,18 +187,46 @@ export function createFlatterling() {
   return root;
 }
 
-export function createBoss() {
+export function createBoss(cfg = {}) {
   const root = new THREE.Group();
   const body = new THREE.Group(); root.add(body);
-  const m = toon(0x9a7ad8, { map: T.fog, emissive: 0x2a1048, ei: 1, unique: true });
+  const style = cfg.style || 'crown';
+  const m = toon(cfg.color ?? 0x9a7ad8, { map: T.fog, emissive: 0x2a1048, ei: 1, unique: true });
   const b = mesh(new THREE.SphereGeometry(2.3, 32, 24), m, 0, 2.2, 0, body); b.scale.set(1, 0.92, 1);
-  // Krone
-  const crownM = toon(0x2b1a40, { emissive: 0x6a2fa0, ei: 0.3 });
-  const ring = mesh(new THREE.CylinderGeometry(1.1, 1.25, 0.5, 8, 1, true), crownM, 0, 4.15, 0, body);
-  ring.material.side = THREE.DoubleSide;
-  for (let i = 0; i < 8; i++) {
-    const a = i / 8 * Math.PI * 2;
-    mesh(new THREE.ConeGeometry(0.22, 0.7, 6), crownM, Math.cos(a) * 1.1, 4.6, Math.sin(a) * 1.1, body);
+  // Kopfschmuck je nach Boss
+  const accM = toon(cfg.accent ?? 0x2b1a40, { emissive: cfg.accentGlow ?? 0x6a2fa0, ei: 0.3 });
+  if (style === 'crown') {
+    const ring = mesh(new THREE.CylinderGeometry(1.1, 1.25, 0.5, 8, 1, true), accM, 0, 4.15, 0, body);
+    ring.material.side = THREE.DoubleSide;
+    for (let i = 0; i < 8; i++) {
+      const a = i / 8 * Math.PI * 2;
+      mesh(new THREE.ConeGeometry(0.22, 0.7, 6), accM, Math.cos(a) * 1.1, 4.6, Math.sin(a) * 1.1, body);
+    }
+  } else if (style === 'horns') {
+    for (const sx of [-1, 1]) {
+      const h = mesh(new THREE.ConeGeometry(0.35, 1.8, 8), accM, sx * 1.4, 4.1, 0, body); h.rotation.z = -sx * 0.6;
+    }
+  } else if (style === 'spikes') {
+    for (let i = 0; i < 9; i++) {
+      const a = i / 9 * Math.PI * 2;
+      const sp = mesh(new THREE.ConeGeometry(0.28, 1.2, 6), accM, Math.cos(a) * 1.6, 3.6, Math.sin(a) * 1.6, body);
+      sp.rotation.z = -Math.cos(a) * 0.6; sp.rotation.x = Math.sin(a) * 0.6;
+    }
+  } else if (style === 'leaves') {
+    for (let i = 0; i < 6; i++) {
+      const a = i / 6 * Math.PI * 2;
+      const lf = mesh(new THREE.SphereGeometry(1, 10, 8), accM, Math.cos(a) * 0.9, 4.3, Math.sin(a) * 0.9, body);
+      lf.scale.set(0.35, 0.12, 0.8); lf.rotation.y = -a; lf.rotation.x = 0.5;
+    }
+  } else if (style === 'hat') {
+    mesh(new THREE.CylinderGeometry(1.9, 1.9, 0.15, 20), accM, 0, 4.05, 0, body);
+    mesh(new THREE.CylinderGeometry(0.9, 1.1, 1.3, 16), accM, 0, 4.7, 0, body);
+  } else if (style === 'tentacles') {
+    for (let i = 0; i < 6; i++) {
+      const a = i / 6 * Math.PI * 2;
+      const tn = mesh(new THREE.CylinderGeometry(0.1, 0.3, 1.6, 8), accM, Math.cos(a) * 1.2, 4.3, Math.sin(a) * 1.2, body);
+      tn.rotation.z = -Math.cos(a) * 0.5; tn.rotation.x = Math.sin(a) * 0.5;
+    }
   }
   // Morgenlicht-Kristall (Schwachstelle)
   const gemM = new THREE.MeshToonMaterial({ color: 0xbff7ff, emissive: 0x55e0ff, emissiveIntensity: 1.2, gradientMap: T.toonGradient });
@@ -214,7 +242,7 @@ export function createBoss() {
     const brow = mesh(new THREE.BoxGeometry(0.9, 0.18, 0.2), toon(0x1a0f2a), sx * 0.75, 3.35, 2.0, body); brow.rotation.z = sx * 0.35;
   }
   // Monokel – Graf Nebelmaul ist sehr eitel
-  const mono = mesh(new THREE.TorusGeometry(0.52, 0.06, 8, 24), toon(0xe6c35a), 0.75, 2.8, 2.05, body); mono.userData.noOutline = true;
+  if (cfg.monocle !== false) { const mono = mesh(new THREE.TorusGeometry(0.52, 0.06, 8, 24), toon(0xe6c35a), 0.75, 2.8, 2.05, body); mono.userData.noOutline = true; }
   // Maul
   const mouth = mesh(new THREE.SphereGeometry(1, 20, 12), toon(0x1a0b24), 0, 1.8, 1.95, body); mouth.scale.set(0.9, 0.35, 0.3);
   mouth.userData.noOutline = true;
@@ -229,7 +257,7 @@ export function createBoss() {
     hands.push(h); addOutline(h, 0.06);
   }
   // Nebelschwaden
-  const puffM = toon(0xa58ad6, { transparent: true, opacity: 0.6 });
+  const puffM = toon(cfg.puff ?? 0xa58ad6, { transparent: true, opacity: 0.6 });
   const puffs = new THREE.Group(); root.add(puffs);
   for (let i = 0; i < 10; i++) {
     const a = i / 10 * Math.PI * 2;
@@ -449,5 +477,95 @@ export function createLighthouse() {
   mesh(new THREE.ConeGeometry(1.1, 1.2, 16), r, 0, 13.2, 0, root);
   addOutline(root, 0.06);
   root.userData = { lamp };
+  return root;
+}
+
+// ---------------- Geheimnisse ----------------
+export function createMoonstone(collected = false) {
+  const root = new THREE.Group();
+  const s = new THREE.Shape();
+  s.absarc(0, 0, 0.55, Math.PI * 0.25, Math.PI * 1.75, false);
+  s.absarc(0.28, 0, 0.42, Math.PI * 1.62, Math.PI * 0.38, true);
+  const g = new THREE.ExtrudeGeometry(s, { depth: 0.16, bevelEnabled: true, bevelThickness: 0.06, bevelSize: 0.05, bevelSegments: 2, curveSegments: 20 });
+  g.center();
+  const mat = new THREE.MeshToonMaterial({ color: collected ? 0x8a9ab8 : 0xd8e8ff, emissive: collected ? 0x203040 : 0x6a9aff, emissiveIntensity: 0.8, gradientMap: T.toonGradient, transparent: collected, opacity: collected ? 0.45 : 1 });
+  const m = mesh(g, mat, 0, 0, 0, root);
+  m.rotation.z = 0.3;
+  if (!collected) addOutline(m, 0.04);
+  root.add(glowSprite(0x9ab8ff, 2.6, collected ? 0.25 : 0.8));
+  return root;
+}
+
+export function createKey() {
+  const root = new THREE.Group();
+  const gm = toon(0xffd23f, { emissive: 0xffa000, ei: 0.5 });
+  const ring = mesh(new THREE.TorusGeometry(0.28, 0.09, 8, 20), gm, 0, 0.35, 0, root);
+  mesh(new THREE.BoxGeometry(0.12, 0.7, 0.12), gm, 0, -0.2, 0, root);
+  mesh(new THREE.BoxGeometry(0.25, 0.1, 0.12), gm, 0.12, -0.45, 0, root);
+  mesh(new THREE.BoxGeometry(0.2, 0.1, 0.12), gm, 0.1, -0.25, 0, root);
+  mesh(new THREE.SphereGeometry(0.1, 8, 6), toon(0x9ff4ff, { emissive: 0x5fd8ff, ei: 1 }), 0, 0.35, 0, root);
+  addOutline(root, 0.03);
+  root.add(glowSprite(0xffe066, 2.2, 0.7));
+  root.scale.setScalar(1.3);
+  return root;
+}
+
+export function createPalm(rand) {
+  const root = new THREE.Group();
+  const trunkM = toon(0xa0784a);
+  const n = 5;
+  let x = 0, y = 0;
+  for (let i = 0; i < n; i++) {
+    const seg = mesh(new THREE.CylinderGeometry(0.16, 0.2, 0.7, 7), trunkM, x, y + 0.35, 0, root);
+    seg.rotation.z = -0.08 * i; x += 0.06 * i; y += 0.65;
+  }
+  const lm = toon(0x4fae4a);
+  for (let i = 0; i < 6; i++) {
+    const a = i / 6 * Math.PI * 2 + rand();
+    const l = mesh(new THREE.SphereGeometry(1, 10, 6), lm, x + Math.cos(a) * 0.9, y + 0.1, Math.sin(a) * 0.9, root);
+    l.scale.set(1.0, 0.08, 0.3); l.rotation.y = -a; l.rotation.z = -0.35;
+  }
+  addOutline(root, 0.03);
+  return root;
+}
+
+export function createCoralPlant(rand) {
+  const root = new THREE.Group();
+  const cols = [0xff7a8a, 0xffb36b, 0xb08aff, 0x6fe8d8];
+  const m = toon(cols[Math.floor(rand() * cols.length)], { emissive: 0x401020, ei: 0.4 });
+  const branch = (x, y, z, h, rz, rx, depth) => {
+    const b = mesh(new THREE.CylinderGeometry(0.08 * (depth + 1), 0.12 * (depth + 1), h, 6), m, x, y + h / 2, z, root);
+    b.rotation.set(rx, 0, rz);
+    if (depth > 0) for (let i = 0; i < 2; i++) branch(x + Math.sin(rz) * -h * 0.5, y + h * 0.8, z, h * 0.7, rz + (i ? 0.6 : -0.6), rx + (rand() - 0.5) * 0.6, depth - 1);
+    else mesh(new THREE.SphereGeometry(0.13, 6, 4), m, x - Math.sin(rz) * h, y + h, z, root);
+  };
+  branch(0, 0, 0, 0.8, 0, 0, 2);
+  return root;
+}
+
+export function createGear(r = 2, color = 0xc9a24a) {
+  const root = new THREE.Group();
+  const m = toon(color, { map: T.metal });
+  const ring = mesh(new THREE.TorusGeometry(r, r * 0.18, 8, 24), m, 0, 0, 0, root);
+  const n = Math.round(r * 6);
+  for (let i = 0; i < n; i++) {
+    const a = i / n * Math.PI * 2;
+    const t = mesh(new THREE.BoxGeometry(r * 0.3, r * 0.3, r * 0.25), m, Math.cos(a) * r * 1.15, Math.sin(a) * r * 1.15, 0, root);
+    t.rotation.z = a;
+  }
+  for (let i = 0; i < 3; i++) { const sp = mesh(new THREE.BoxGeometry(r * 2, r * 0.14, r * 0.12), m, 0, 0, 0, root); sp.rotation.z = i / 3 * Math.PI; }
+  addOutline(root, 0.04);
+  return root;
+}
+
+export function createSnowman(rand) {
+  const root = new THREE.Group();
+  const w = toon(0xffffff);
+  mesh(new THREE.SphereGeometry(0.6, 14, 10), w, 0, 0.55, 0, root);
+  mesh(new THREE.SphereGeometry(0.42, 14, 10), w, 0, 1.3, 0, root);
+  mesh(new THREE.ConeGeometry(0.07, 0.35, 8), toon(0xff8a3c), 0, 1.32, 0.45, root).rotation.x = Math.PI / 2;
+  mesh(new THREE.CylinderGeometry(0.25, 0.28, 0.35, 12), toon(0x2a2a3a), 0, 1.8, 0, root);
+  addOutline(root, 0.03);
+  root.rotation.y = rand() * 6;
   return root;
 }

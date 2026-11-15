@@ -7,28 +7,27 @@ import { Input } from './input.js';
 import { Particles } from './particles.js';
 import { Player } from './player.js';
 import { Level } from './world.js';
-import { LEVELS } from './levels.js';
+import { HANDMADE } from './levels.js';
+import { WORLDS, WORLD_REQ, BOSS_IDX, BONUS_IDX, LEVELS_PER_WORLD } from './worlds.js';
 import { HUD } from './ui.js';
-import { INTRO, LEVEL_STORY, ENDING } from './story.js';
+import { t, setLang, detectLang, LANGS, getLang } from './i18n/index.js';
 
 const STEP = 1 / 120;
-const SAVE_KEY = 'lumi_save_v1';
+const SAVE_KEY = 'lumi_save_v2';
 
-const CONTROLS = `
-<table class="controls">
-<tr><th></th><th>Tastatur / Maus</th><th>Gamepad</th></tr>
-<tr><td>Laufen</td><td>WASD / Pfeiltasten</td><td>Linker Stick</td></tr>
-<tr><td>Springen / Doppelsprung</td><td>Leertaste (2×)</td><td>A</td></tr>
-<tr><td>Drehattacke</td><td>F / J / Linksklick</td><td>X / B</td></tr>
-<tr><td>Stampfen (in der Luft)</td><td>Shift / C / Rechtsklick</td><td>LB / RB / Trigger</td></tr>
-<tr><td>Kamera</td><td>Maus (Klick ins Bild) / Q, E, R, V</td><td>Rechter Stick</td></tr>
-<tr><td>Pause</td><td>Esc / P</td><td>Start</td></tr>
-<tr><td>Ton an/aus</td><td>M</td><td></td></tr>
-</table>
-<p class="tip">Auf dem Handy: Stick links, Knöpfe rechts, Kamera durch Wischen.</p>`;
+function controlsHtml() {
+  const c = (k) => t('controls.' + k);
+  const row = (a, b, p) => `<tr><td>${c(a)}</td><td>${b}</td><td>${p}</td></tr>`;
+  return `<table class="controls"><tr><th></th><th>${c('keyboard')}</th><th>${c('gamepad')}</th></tr>
+${row('run', c('kRun'), c('pRun'))}${row('jump', c('kJump'), 'A')}${row('spin', c('kSpin'), 'X / B')}
+${row('pound', c('kPound'), 'LB / RB')}${row('camera', c('kCam'), c('pCam'))}${row('pause', c('kPause'), 'Start')}${row('mute', 'M', '')}
+</table><p class="tip">${c('tip')}</p>`;
+}
 
 class Game {
   constructor() {
+    setLang(detectLang());
+    this.t = t;
     const canvas = document.getElementById('game');
     this.canvas = canvas;
     const renderer = this.renderer = new THREE.WebGLRenderer({ canvas, antialias: true, powerPreference: 'high-performance' });
@@ -52,10 +51,12 @@ class Game {
     this.shakeT = 0;
     this.acc = 0;
     this.save = this.loadSave();
-    this.lives = 3; this.hearts = 3; this.sparks = 0; this.shards = 0;
+    this.lives = 3; this.hearts = 3; this.sparks = 0;
     this.levelGot = 0; this.levelTime = 0; this.timer = 0;
     this.lighthouseLit = false;
     this.state = 'title';
+    this.mapWorld = 0;
+    this.applyLangToDom();
 
     window.addEventListener('resize', () => {
       this.camera.aspect = window.innerWidth / window.innerHeight;
@@ -75,27 +76,77 @@ class Game {
     });
 
     const params = new URLSearchParams(location.search);
-    if (params.has('level')) {
-      const i = Math.max(0, Math.min(LEVELS.length - 1, parseInt(params.get('level'), 10) || 0));
-      this.startLevel(i, true);
+    if (params.has('w')) {
+      this.startLevel(+params.get('w') || 0, +params.get('l') || 0, true);
     } else this.toTitle();
     this.last = performance.now();
     this.frame = this.frame.bind(this);
     requestAnimationFrame(this.frame);
   }
 
+  applyLangToDom() {
+    document.querySelector('[data-btn="jump"]').textContent = t('ui.jump');
+    document.querySelector('[data-btn="spin"]').textContent = t('ui.spin');
+    document.querySelector('[data-btn="pound"]').textContent = t('ui.pound');
+    document.querySelector('#dialog .next').textContent = t('ui.next') + ' ▶';
+    document.title = 'LUMI – ' + t('ui.subtitle');
+  }
+
+  // ---------------- Fortschritt ----------------
+  spec(w, i) {
+    const kind = i === BOSS_IDX ? 'boss' : i === BONUS_IDX ? 'bonus' : 'normal';
+    const star = !!this.star;
+    const s = { world: w, index: i, kind, star, seed: (w + 1) * 1000 + i * 37 + 5 + (star ? 50000 : 0) };
+    if (i === 0 && HANDMADE[w] && !star) { s.build = HANDMADE[w].build; s.seed = HANDMADE[w].seed; }
+    return s;
+  }
+  pre() { return this.star ? 's' : ''; }
+  levelName(w, i) {
+    if (i === BOSS_IDX) return t(`worlds.${w}.boss`);
+    if (i === BONUS_IDX) return t('ui.bonusLevel');
+    return t(`worlds.${w}.levels.${i}`);
+  }
+  rec(w, i) {
+    const k = this.pre() + w + '-' + i;
+    if (!this.save.levels[k]) this.save.levels[k] = { done: false, ms: [0, 0, 0], best: 0, all: false, time: 0, medal: false };
+    return this.save.levels[k];
+  }
+  hasMoonstone(spec, idx) { return !!this.rec(spec.world, spec.index).ms[idx]; }
+  hasKey(w) { return !!this.save.keys[this.pre() + w]; }
+  moonCount(star = this.star) { let n = 0; for (const k in this.save.levels) if ((k[0] === 's') === !!star) n += this.save.levels[k].ms.reduce((a, b) => a + b, 0); return n; }
+  moonTotal() { return WORLDS.length * 6 * 3; }
+  shardCount() { let n = 0; for (let w = 0; w < 7; w++) if (this.save.bosses[w]) n++; return n; }
+  starOpen() { return !!this.save.bosses[7]; }
+  worldOpen(w) {
+    if (this.star) return this.starOpen() && (w === 0 || !!this.save.bosses['s' + (w - 1)]);
+    return w === 0 || (!!this.save.bosses[w - 1] && this.moonCount() >= WORLD_REQ[w]);
+  }
+  levelOpen(w, i) {
+    if (!this.worldOpen(w)) return false;
+    if (i === 0) return true;
+    if (i === BONUS_IDX) return this.hasKey(w);
+    return this.rec(w, i - 1).done;
+  }
+  lockReason(w, i) {
+    if (!this.worldOpen(w)) return w > 0 && !this.save.bosses[this.pre() + (w - 1)] ? t('ui.needBoss', { n: w }) : t('ui.needMoonstones', { n: WORLD_REQ[w] });
+    if (i === BONUS_IDX) return t('ui.needKey');
+    return t('ui.needLevels');
+  }
+  hasProgress() { return Object.keys(this.save.levels).length > 0; }
+
   // ---------------- Speicherstand ----------------
   loadSave() {
-    try { return JSON.parse(localStorage.getItem(SAVE_KEY)) || { unlocked: 0, best: {} }; } catch (e) { return { unlocked: 0, best: {} }; }
+    const empty = { levels: {}, keys: {}, bosses: {}, seen: {}, sparks: 0 };
+    try { return { ...empty, ...(JSON.parse(localStorage.getItem(SAVE_KEY)) || {}) }; } catch (e) { return empty; }
   }
   writeSave() { try { localStorage.setItem(SAVE_KEY, JSON.stringify(this.save)); } catch (e) { /* egal */ } }
 
-  // ---------------- Level ----------------
-  loadLevel(i) {
+  // ---------------- Level laden ----------------
+  loadLevel(w, i) {
     if (this.level) { this.scene.remove(this.level.group); this.level.dispose(); }
     this.particles.clear();
-    this.levelIndex = i;
-    this.level = new Level(LEVELS[i], this);
+    this.cur = { w, i };
+    this.level = new Level(this.spec(w, i), this);
     this.scene.add(this.level.group);
     this.scene.fog = this.level.fog;
     const s = this.level.spawnPoint;
@@ -107,80 +158,153 @@ class Game {
     this.hud.hint(null);
   }
 
+  // ---------------- Menüs ----------------
   toTitle() {
     this.state = 'title';
     this.input.releaseLock();
     this.lighthouseLit = false;
-    this.loadLevel(0);
+    if (!this.level || this.cur.w !== 0 || this.cur.i !== 0) this.loadLevel(0, 0);
     this.hud.show(false);
     this.setTouch(false);
     this.audio.playMusic('title');
-    const hasSave = this.save.unlocked > 0;
+    const prog = this.hasProgress();
+    const items = [];
+    if (prog) items.push({ label: t('ui.continue'), action: () => { this.star = false; this.showMap(this.save.lastWorld ?? 0); } });
+    items.push({ label: t('ui.newGame'), action: () => (prog ? this.confirmNew() : this.newGame()) });
+    items.push({ label: `${t('ui.language')}: ${LANGS[getLang()].name}`, action: () => this.langMenu(() => this.toTitle()) });
+    items.push({ label: t('ui.controls'), action: () => this.showControls(() => this.toTitle()) });
+    items.push({ label: `${t('ui.sound')}: ${this.audio.muted ? t('ui.off') : t('ui.on')}`, action: () => { this.audio.toggleMute(); this.toTitle(); } });
+    this.hud.showMenu({ cls: 'title-screen', title: '<span class="logo">LUMI</span>', subtitle: t('ui.subtitle'), items });
+  }
+
+  confirmNew() {
     this.hud.showMenu({
-      cls: 'title-screen',
-      title: '<span class="logo">LUMI</span>',
-      subtitle: 'und das Morgenlicht',
+      title: t('ui.newGame') + '?',
+      body: `${t('ui.progress')}: ${this.moonCount()} ${t('ui.moonstones')} → 0`,
       items: [
-        { label: 'Neues Abenteuer', action: () => this.newGame() },
-        { label: hasSave ? `Fortsetzen – ${LEVELS[Math.min(this.save.unlocked, LEVELS.length - 1)].name}` : 'Fortsetzen', disabled: !hasSave, action: () => this.continueGame() },
-        { label: 'Welt wählen', disabled: !hasSave, action: () => this.levelSelect() },
-        { label: 'Steuerung', action: () => this.showControls(() => this.toTitle()) },
-        { label: this.audio.muted ? 'Ton: Aus' : 'Ton: An', action: () => { this.audio.toggleMute(); this.toTitle(); } },
+        { label: t('ui.newGame'), action: () => { this.save = { levels: {}, keys: {}, bosses: {}, seen: {}, sparks: 0 }; this.writeSave(); this.newGame(); } },
+        { label: t('ui.back'), action: () => this.toTitle() },
       ],
+      sel: 1,
     });
   }
 
-  showControls(back) {
-    this.hud.showMenu({ title: 'Steuerung', body: CONTROLS, items: [{ label: 'Zurück', action: back }] });
+  langMenu(back) {
+    const items = Object.entries(LANGS).map(([k, L]) => ({
+      label: (k === getLang() ? '✓ ' : '') + L.name,
+      action: () => { setLang(k); this.applyLangToDom(); this.refreshHud(); back(); },
+    }));
+    items.push({ label: t('ui.back'), action: back });
+    this.hud.showMenu({ title: t('ui.language'), items, sel: Object.keys(LANGS).indexOf(getLang()) });
   }
 
-  levelSelect() {
-    const items = LEVELS.map((L, i) => ({
-      label: `${L.sub}: ${L.name}${this.save.best[i] !== undefined ? '  ✦ ' + this.save.best[i] : ''}`,
-      disabled: i > this.save.unlocked,
-      action: () => { this.lives = 3; this.sparks = 0; this.shards = Math.min(3, i); this.hud.hideMenu(); this.startLevel(i); },
-    }));
-    items.push({ label: 'Zurück', action: () => this.toTitle() });
-    this.hud.showMenu({ title: 'Welt wählen', items });
+  showControls(back) {
+    this.hud.showMenu({ title: t('ui.controls'), body: controlsHtml(), items: [{ label: t('ui.back'), action: back }] });
   }
 
   newGame() {
     this.hud.hideMenu();
-    this.lives = 3; this.sparks = 0; this.shards = 0;
+    this.lives = 3; this.sparks = 0;
     this.state = 'story';
     this.audio.playMusic('title');
-    this.hud.dialog(INTRO, () => this.startLevel(0));
+    this.dialog(t('story.intro'), () => this.playLevel(0, 0));
   }
 
-  continueGame() {
+  dialog(lines, done, w = 0) {
+    const conv = (lines || []).map(([role, text]) => ({ role, text, who: role === 'b' ? t(`worlds.${w}.boss`) : t('story.who.' + role) }));
+    this.hud.dialog(conv, done);
+  }
+
+  levelLabel(w, i) {
+    const r = this.rec(w, i);
+    const open = this.levelOpen(w, i);
+    const num = i === BOSS_IDX ? '☠' : i === BONUS_IDX ? '★' : `${w + 1}-${i + 1}`;
+    let icons = '';
+    if (i !== BOSS_IDX) icons += r.ms.map((v) => `<span class="moon ${v ? 'full' : ''}"></span>`).join('');
+    if (r.all) icons += ' <span class="spark-icon"></span>';
+    if (r.medal) icons += ' <span class="medal">⏱</span>';
+    if (i === 2 && this.hasKey(w)) icons += ' <span class="keyic">🗝</span>';
+    if (i === BOSS_IDX && r.done) icons += ' <span class="shard full"></span>';
+    const name = open ? this.levelName(w, i) : '???';
+    const sub = open ? '' : `<small>🔒 ${this.lockReason(w, i)}</small>`;
+    return `<span class="lvl"><span class="nm">${num} · ${name}${sub}</span><span class="ic">${icons}</span></span>`;
+  }
+
+  showMap(w, sel = null) {
+    w = Math.max(0, Math.min(WORLDS.length - 1, w));
+    this.mapWorld = w;
+    this.state = 'map';
+    this.hud.show(false);
+    this.setTouch(false);
+    this.input.releaseLock();
+    const open = this.worldOpen(w);
+    if (!this.level || this.cur.w !== w || this.cur.i !== 0 || !!this.level.spec.star !== !!this.star) this.loadLevel(w, 0);
+    this.audio.playMusic(open ? WORLDS[w].music : 'title');
+    const bar = WORLDS.map((W, k) => `<span class="${this.worldOpen(k) ? 'open' : ''} ${k === w ? 'cur' : ''}" style="background:${W.color}"></span>`).join('');
+    let wm = 0; for (let i = 0; i < LEVELS_PER_WORLD; i++) wm += this.rec(w, i).ms.reduce((a, b) => a + b, 0);
+    const body = `<div class="worldbar">${bar}</div>
+      <div><span class="moon full"></span> ${this.moonCount()} / ${this.moonTotal()} &nbsp; · &nbsp; ${t('ui.world', { n: w + 1 })}: ${wm} / 18 &nbsp; · &nbsp; ${this.shardCount()} / 7 <span class="shard full"></span></div>
+      ${this.moonCount() >= this.moonTotal() ? `<p>${t('ui.allMoonstones')}</p>` : ''}`;
+    const items = [];
+    if (open) {
+      for (let i = 0; i < LEVELS_PER_WORLD; i++) {
+        const lo = this.levelOpen(w, i);
+        items.push({ html: this.levelLabel(w, i), disabled: !lo, action: () => this.playLevel(w, i) });
+      }
+    } else {
+      items.push({ html: `<small>🔒 ${this.lockReason(w, 0)}</small>`, disabled: true, action: () => {} });
+    }
+    if (this.starOpen()) items.push({ label: this.star ? t('ui.normalPaths') : '✦ ' + t('ui.starPaths'), action: () => { this.star = !this.star; this.showMap(w); } });
+    if (w > 0) items.push({ label: t('ui.prevWorld'), action: () => this.showMap(w - 1) });
+    if (w < WORLDS.length - 1) items.push({ label: t('ui.nextWorld'), action: () => this.showMap(w + 1) });
+    items.push({ label: t('ui.mainMenu'), action: () => { this.hud.hideMenu(); this.toTitle(); } });
+    let defSel = sel;
+    if (defSel === null) { defSel = 0; for (let i = 0; i < LEVELS_PER_WORLD; i++) if (this.levelOpen(w, i) && !this.rec(w, i).done) { defSel = i; break; } }
+    this.hud.showMenu({
+      cls: 'map', title: `<div class="worldname" style="color:${WORLDS[w].color};text-shadow:0 3px 0 #3a1f14">${t(`worlds.${w}.name`)}</div>`,
+      subtitle: (this.star ? '✦ ' + t('ui.starPaths') + ' · ' : '') + (w === WORLDS.length - 1 ? t('ui.finale') : t('ui.world', { n: w + 1 })), body, items, sel: open ? defSel : items.findIndex((x) => !x.disabled),
+      onLeft: w > 0 ? () => this.showMap(w - 1) : null, onRight: w < WORLDS.length - 1 ? () => this.showMap(w + 1) : null,
+    });
+  }
+
+  playLevel(w, i) {
     this.hud.hideMenu();
-    this.lives = 3; this.sparks = 0;
-    const i = Math.min(this.save.unlocked, LEVELS.length - 1);
-    this.shards = Math.min(3, i);
-    this.startLevel(i);
+    this.save.lastWorld = w; this.writeSave();
+    const before = t(`story.before.${w}`);
+    if (!this.star && !this.save.seen[w] && before && before.length) {
+      this.save.seen[w] = true; this.writeSave();
+      this.loadLevel(w, i);
+      this.state = 'story';
+      this.hud.show(false);
+      this.dialog(before, () => this.startLevel(w, i, true), w);
+      return;
+    }
+    this.startLevel(w, i);
   }
 
-  startLevel(i, skipStory = false) {
-    this.loadLevel(i);
+  startLevel(w, i, quick = false) {
+    if (!this.level || this.cur.w !== w || this.cur.i !== i || !quick || this.level.time > 0.5 || !!this.level.spec.star !== !!this.star) this.loadLevel(w, i);
     this.hearts = 3; this.levelGot = 0; this.levelTime = 0;
     this.hud.show(true);
     this.refreshHud();
-    this.state = 'story';
-    this.audio.playMusic(LEVELS[i].music);
-    const go = () => {
-      this.state = 'play';
-      this.setTouch(true);
-      this.hud.banner(LEVELS[i].name, LEVELS[i].sub);
-    };
-    if (skipStory) go();
-    else this.hud.dialog(LEVEL_STORY[i].before, go);
+    this.state = 'play';
+    this.setTouch(true);
+    this.audio.playMusic(i === BONUS_IDX ? 'bonus' : WORLDS[w].music);
+    this.hud.banner(this.levelName(w, i), `${this.star ? '✦ ' : ''}${t(`worlds.${w}.name`)} · ${i === BOSS_IDX ? t('ui.boss') : i === BONUS_IDX ? '★' : `${w + 1}-${i + 1}`}`);
   }
 
   refreshHud() {
+    if (!this.level) return;
     this.hud.setHearts(this.hearts);
     this.hud.setLives(this.lives);
     this.hud.setSparks(this.sparks, this.levelGot, this.level.sparkTotal);
-    this.hud.setShards(this.shards);
+    this.hud.setShards(this.shardCount());
+    const sp = this.level.spec;
+    if (sp.kind === 'boss') this.hud.setMoons(null);
+    else {
+      const r = this.rec(sp.world, sp.index);
+      this.hud.setMoons([0, 1, 2].map((k) => r.ms[k] || this.level.moonstones.some((m) => m.idx === k && m.taken)));
+    }
   }
 
   setTouch(v) { document.getElementById('touch').classList.toggle('active', v); }
@@ -190,15 +314,19 @@ class Game {
     this.state = 'paused';
     this.setTouch(false);
     this.input.releaseLock();
+    const { w, i } = this.cur;
+    const again = () => { this.state = 'play'; this.pause(); };
     this.hud.showMenu({
-      title: 'Pause',
-      subtitle: `${LEVELS[this.levelIndex].sub}: ${LEVELS[this.levelIndex].name}`,
+      title: t('ui.pause'),
+      subtitle: `${t(`worlds.${w}.name`)} · ${this.levelName(w, i)}`,
       items: [
-        { label: 'Weiterspielen', action: () => this.resume() },
-        { label: 'Welt neu starten', action: () => { this.hud.hideMenu(); this.startLevel(this.levelIndex, true); } },
-        { label: 'Steuerung', action: () => this.showControls(() => { this.state = 'play'; this.pause(); }) },
-        { label: this.audio.muted ? 'Ton: Aus' : 'Ton: An', action: () => { this.audio.toggleMute(); this.state = 'play'; this.pause(); } },
-        { label: 'Hauptmenü', action: () => { this.hud.hideMenu(); this.toTitle(); } },
+        { label: t('ui.resume'), action: () => this.resume() },
+        { label: t('ui.restartLevel'), action: () => { this.hud.hideMenu(); this.startLevel(w, i); } },
+        { label: t('ui.worldMap'), action: () => this.showMap(w) },
+        { label: t('ui.controls'), action: () => this.showControls(again) },
+        { label: `${t('ui.language')}: ${LANGS[getLang()].name}`, action: () => this.langMenu(again) },
+        { label: `${t('ui.sound')}: ${this.audio.muted ? t('ui.off') : t('ui.on')}`, action: () => { this.audio.toggleMute(); again(); } },
+        { label: t('ui.mainMenu'), action: () => { this.hud.hideMenu(); this.toTitle(); } },
       ],
     });
   }
@@ -219,9 +347,32 @@ class Game {
     while (this.sparks >= 100) {
       this.sparks -= 100; this.lives++;
       this.audio.play('oneup');
-      this.hud.toast('100 Funken – ein Extraleben!');
+      this.hud.toast(t('ui.oneUp'));
+    }
+    const L = this.level;
+    if (!bonus && L.spec.kind !== 'boss' && !L.allSparksDone && L.sparkTotal > 0 && this.levelGot >= L.sparkTotal) {
+      L.allSparksDone = true;
+      this.hud.toast(t('ui.moonstoneAll'), 3);
+      L.spawnSparkMoonstone(this.player.pos);
     }
     this.refreshHud();
+  }
+
+  collectMoonstone(idx, pos) {
+    const r = this.rec(this.cur.w, this.cur.i);
+    const fresh = !r.ms[idx];
+    r.ms[idx] = 1; this.writeSave();
+    this.audio.play(fresh ? 'shard' : 'heart');
+    this.hud.toast(fresh ? t('ui.moonstone') : t('ui.moonstoneOld'), 2.5);
+    this.particles.burst(pos, { count: 24, color: [0x9ab8ff, 0xffffff, 0xd8e8ff], speed: 7, size: 0.8, tex: 'sparkle', additive: true, life: 0.9 });
+    this.refreshHud();
+  }
+
+  collectKey(pos) {
+    this.save.keys[this.pre() + this.cur.w] = true; this.writeSave();
+    this.audio.play('oneup');
+    this.hud.toast(t('ui.keyFound'), 3.5);
+    this.particles.burst(pos, { count: 24, color: [0xffe066, 0xffffff], speed: 7, size: 0.8, tex: 'sparkle', additive: true });
   }
 
   addHeart(pos) {
@@ -234,7 +385,7 @@ class Game {
   setCheckpoint(cp) {
     this.checkpoint = { x: cp.x, y: cp.y, z: cp.z, yaw: this.camYaw };
     this.audio.play('checkpoint');
-    this.hud.toast('Laterne entzündet – Checkpoint!');
+    this.hud.toast(t('ui.checkpoint'));
     this.particles.burst(new THREE.Vector3(cp.x + 0.6, cp.y + 2, cp.z), { count: 12, color: 0xffc070, speed: 3, size: 0.6, tex: 'glow', additive: true });
   }
 
@@ -278,12 +429,12 @@ class Game {
     this.setTouch(false);
     this.input.releaseLock();
     this.audio.stopMusic();
+    const { w, i } = this.cur;
     this.hud.showMenu({
-      title: 'Das Licht ist erloschen …',
-      subtitle: 'Aber ein Funke bleibt immer.',
+      title: t('ui.gameOverTitle'), subtitle: t('ui.gameOverSub'),
       items: [
-        { label: 'Nochmal versuchen', action: () => { this.hud.hideMenu(); this.lives = 3; this.sparks = 0; this.startLevel(this.levelIndex, true); } },
-        { label: 'Hauptmenü', action: () => { this.hud.hideMenu(); this.toTitle(); } },
+        { label: t('ui.tryAgain'), action: () => { this.hud.hideMenu(); this.lives = 3; this.startLevel(w, i); } },
+        { label: t('ui.worldMap'), action: () => { this.lives = 3; this.showMap(w); } },
       ],
     });
   }
@@ -298,38 +449,63 @@ class Game {
     this.particles.burst(goal.pos, { count: 30, color: [0x9ff4ff, 0xffffff, 0xffe066], speed: 9, size: 0.8, tex: 'sparkle', additive: true, life: 1 });
     goal.mesh.visible = false; goal.beam.visible = false;
     this.hud.hint(null);
-    const final = this.levelIndex === LEVELS.length - 1;
-    if (!final) this.shards = Math.min(3, this.shards + 1);
-    this.refreshHud();
-    this.hud.banner(final ? 'Der Kern des Morgenlichts!' : 'Splitter gefunden!', final ? '' : `${this.shards} / 3`, 2.6);
-    this.save.unlocked = Math.max(this.save.unlocked, Math.min(LEVELS.length - 1, this.levelIndex + 1));
-    this.save.best[this.levelIndex] = Math.max(this.save.best[this.levelIndex] || 0, this.levelGot);
+    const { w, i } = this.cur;
+    const boss = i === BOSS_IDX;
+    const final = boss && WORLDS[w].boss.final;
+    const r = this.rec(w, i);
+    this.wasDone = r.done;
+    r.done = true;
+    if (boss) this.save.bosses[this.pre() + w] = true;
+    this.newBest = this.levelGot > r.best;
+    r.best = Math.max(r.best, this.levelGot);
+    if (this.level.allSparksDone) r.all = true;
+    this.gotMedal = !boss && this.levelTime <= this.level.par;
+    if (this.gotMedal) r.medal = true;
+    r.time = r.time ? Math.min(r.time, this.levelTime) : this.levelTime;
     this.writeSave();
+    this.refreshHud();
+    this.hud.banner(final ? t('ui.coreFound') : boss ? t('ui.shardFound') : t('ui.goal'), boss && !final ? t('ui.shardCount', { n: this.shardCount() }) : '', 2.6);
   }
 
   showClear() {
-    const i = this.levelIndex;
-    const final = i === LEVELS.length - 1;
+    const { w, i } = this.cur;
+    const boss = i === BOSS_IDX;
+    const final = boss && WORLDS[w].boss.final;
     this.state = 'clearmenu';
     this.audio.play('clear');
-    const m = Math.floor(this.levelTime / 60), s = Math.floor(this.levelTime % 60);
-    const body = `<div class="stats"><div><span class="spark-icon"></span> Funken: <b>${this.levelGot} / ${this.level.sparkTotal}</b></div><div>⏱ Zeit: <b>${m}:${String(s).padStart(2, '0')}</b></div></div>`;
-    this.hud.showMenu({
-      title: final ? 'Graf Nebelmaul besiegt!' : `${LEVELS[i].name} geschafft!`,
-      body,
-      items: [{
-        label: 'Weiter', action: () => {
+    const fmt = (x) => `${Math.floor(x / 60)}:${String(Math.floor(x % 60)).padStart(2, '0')}`;
+    const r = this.rec(w, i);
+    let body = `<div class="stats"><div><span class="spark-icon"></span> ${t('ui.sparks')}: <b>${this.levelGot} / ${this.level.sparkTotal}</b></div>
+      <div>⏱ ${t('ui.time')}: <b>${fmt(this.levelTime)}</b>${boss ? '' : ` &nbsp;(${t('ui.par')}: ${fmt(this.level.par)})`}</div>`;
+    if (!boss) body += `<div class="moonsrow">${r.ms.map((v) => `<span class="moon ${v ? 'full' : ''}"></span>`).join('')}</div>`;
+    if (this.gotMedal) body += `<div class="medal">⏱ ${t('ui.medal')}</div>`;
+    body += '</div>';
+    const toMap = () => this.showMap(w);
+    const items = [];
+    if (boss) {
+      items.push({
+        label: t('ui.next'), action: () => {
           this.hud.hideMenu();
           this.state = 'story';
-          this.hud.dialog(LEVEL_STORY[i].after, () => { if (final) this.ending(); else this.startLevel(i + 1); });
+          const after = t(`story.after.${w}`);
+          this.dialog(after, () => {
+            if (final) { this.ending(); return; }
+            this.showMap(w + 1);
+            if (this.worldOpen(w + 1) && !this.wasDone) this.hud.toast(t('ui.worldUnlocked', { name: t(`worlds.${w + 1}.name`) }), 3.5);
+          }, w);
         },
-      }],
-    });
+      });
+    } else {
+      const nxt = i < BOSS_IDX - 1 || i === BOSS_IDX - 1 ? i + 1 : null;
+      if (nxt !== null && i !== BONUS_IDX && this.levelOpen(w, nxt)) items.push({ label: `${t('ui.next')}: ${this.levelName(w, nxt)}`, action: () => this.playLevel(w, nxt) });
+      items.push({ label: t('ui.worldMap'), action: toMap });
+    }
+    this.hud.showMenu({ title: boss ? t('ui.bossDefeated', { name: this.levelName(w, i) }) : t('ui.cleared', { name: this.levelName(w, i) }), body, items });
   }
 
   bossDefeated() {
     this.audio.play('shard');
-    this.hud.toast('Der Nebel lichtet sich! Hol dir den Kern!', 3);
+    this.hud.toast(t('ui.fogClears'), 3);
     this.audio.playMusic('ending');
   }
 
@@ -337,22 +513,39 @@ class Game {
     this.state = 'ending';
     this.hud.show(false);
     this.lighthouseLit = true;
-    this.loadLevel(0);
+    this.loadLevel(0, 0);
     this.player.mesh.visible = false;
     this.audio.playMusic('ending');
-    this.endT = 0;
-    this.hud.dialog(ENDING, () => {
+    this.dialog(t('story.ending'), () => {
+      const all = this.moonCount() >= this.moonTotal();
       this.hud.showMenu({
         cls: 'title-screen',
-        title: '<span class="logo">ENDE</span>',
-        subtitle: 'Danke fürs Spielen!',
-        body: `<p>Lumeria leuchtet wieder.</p><p class="credits">Idee, Code, Grafik, Musik & Story: komplett selbstgemacht – alles wird beim Start prozedural erzeugt.</p>`,
-        items: [{ label: 'Zum Hauptmenü', action: () => { this.hud.hideMenu(); this.toTitle(); } }],
+        title: `<span class="logo">${t('ui.theEnd')}</span>`,
+        subtitle: t('ui.thanks'),
+        body: `<p>${t('ui.endText')}</p><p>✦ ${t('ui.starUnlocked')}</p><p><span class="moon full"></span> ${this.moonCount()} / ${this.moonTotal()}</p>${all ? `<p>${t('ui.allMoonstones')}</p>` : ''}<p class="credits">${t('ui.credits')}</p>`,
+        items: [{ label: '✦ ' + t('ui.starPaths'), action: () => { this.star = true; this.showMap(0); } }, { label: t('ui.mainMenu'), action: () => { this.hud.hideMenu(); this.toTitle(); } }],
       });
     });
   }
 
   // Test-Helfer: simuliert einen Sprung von A nach B mit echter Physik (wird vom Level-Test genutzt)
+  // Prüft alle notierten Sprünge eines Levels (Mover in Position, Blinkplatten an, Geysire aus)
+  debugTestLevel(w, i) {
+    this.loadLevel(w, i);
+    this.state = 'test';
+    const L = this.level;
+    L.freeze = true;
+    const fails = [];
+    L.links.forEach((lk, n) => {
+      if (lk.o.mover !== undefined) L.setMover(lk.o.mover, lk.o);
+      let r1 = this.debugHop(lk.a, lk.b, { jump: 1, ...lk.o });
+      if (!r1.ok && lk.o.mover !== undefined) L.setMover(lk.o.mover, lk.o);
+      if (!r1.ok) r1 = this.debugHop(lk.a, lk.b, { ...lk.o, jump: 1, double: 1 });
+      if (!r1.ok) fails.push({ n, a: lk.a.map((v) => +v.toFixed(1)), b: lk.b.map((v) => +v.toFixed(1)), o: lk.o, r: r1 });
+    });
+    return { links: L.links.length, fails, sparks: L.sparkTotal, ms: L.moonstones.length, key: !!L.keyItem, par: L.par, platforms: L.colliders.length };
+  }
+
   debugHop(a, b, o = {}) {
     const p = this.player, L = this.level;
     for (const e of L.enemies) { e.alive = false; e.mesh.visible = false; }
@@ -372,7 +565,9 @@ class Game {
       if (p.pos.y < L.killY + 2) return { fell: true, at: p.pos.toArray().map((v) => +v.toFixed(2)) };
       p.step(STEP, snap, L, yaw);
       if (i > 12 && p.grounded && p.ground && !p.ground.bounce && Math.abs(p.vel.y) < 1e-6 && Math.hypot(p.vel.x, p.vel.z) < 0.01 + (near ? 9 : 0) && near) {
-        return { landed: +p.pos.y.toFixed(2), ok: Math.abs(p.pos.y - b[1]) < 0.05, at: p.pos.toArray().map((v) => +v.toFixed(2)) };
+        const gc = p.ground;
+        return { landed: +p.pos.y.toFixed(2), ok: Math.abs(p.pos.y - b[1]) < 0.05, at: p.pos.toArray().map((v) => +v.toFixed(2)),
+          on: gc.type + (gc.crate ? ' crate' : '') + (gc.dynamic ? ' mover' : '') + (gc.r ? ' r' + gc.r.toFixed(2) : '') + (gc.type === 'box' ? ` ${(gc.maxX - gc.minX).toFixed(1)}x${(gc.maxZ - gc.minZ).toFixed(1)}` : '') + ` y${gc.minY.toFixed(1)}..${gc.maxY.toFixed(1)}` };
       }
     }
     return { timeout: true, at: p.pos.toArray().map((v) => +v.toFixed(2)), y: p.pos.y };
@@ -384,7 +579,7 @@ class Game {
   // ---------------- Hauptschleife ----------------
   frame(now) {
     requestAnimationFrame(this.frame);
-    const dt = Math.min(0.1, (now - this.last) / 1000);
+    const dt = Math.max(0, Math.min(0.1, (now - this.last) / 1000));
     this.last = now;
     const input = this.input;
     input.pollPad();
@@ -470,7 +665,7 @@ class Game {
   updateCamera(dt) {
     const cam = this.camera, p = this.player.pos;
     const ci = this.input.camera();
-    if (this.state === 'title' || this.state === 'ending' || (this.state === 'story' && !this.hud.el.hud.classList.contains('show'))) {
+    if (this.state === 'title' || this.state === 'map' || this.state === 'ending' || (this.state === 'story' && !this.hud.el.hud.classList.contains('show'))) {
       const t = performance.now() / 1000;
       let c = this.level.spawnPoint, dist = 16, h = 5;
       if (this.state === 'ending' && this.level.lighthouseObj) { c = this.level.lighthouseObj.position; dist = 34; h = 10; }

@@ -19,6 +19,12 @@ const TRACKS = {
   sky:     { bpm: 132, root: 62, scale: 'major',    prog: [0, 3, 4, 3], seed: 21, lead: 'square',   arp: 'triangle', drums: true,  echo: 0.2,  arpRate: 2 },
   tower:   { bpm: 108, root: 52, scale: 'harmonic', prog: [0, 5, 3, 4], seed: 33, lead: 'sawtooth', arp: 'triangle', drums: true,  echo: 0.3,  arpRate: 2 },
   boss:    { bpm: 152, root: 50, scale: 'harmonic', prog: [0, 0, 5, 4], seed: 41, lead: 'sawtooth', arp: 'square',   drums: true,  echo: 0.1,  arpRate: 4 },
+  lava:    { bpm: 124, root: 53, scale: 'harmonic', prog: [0, 5, 6, 4], seed: 61, lead: 'sawtooth', arp: 'square',   drums: true,  echo: 0.15, arpRate: 4 },
+  ice:     { bpm: 100, root: 67, scale: 'lydian',   prog: [0, 1, 5, 4], seed: 71, lead: 'sine',     arp: 'triangle', drums: true,  echo: 0.5,  arpRate: 4 },
+  desert:  { bpm: 112, root: 59, scale: 'harmonic', prog: [0, 1, 0, 6], seed: 81, lead: 'triangle', arp: 'triangle', drums: true,  echo: 0.25, arpRate: 2 },
+  coral:   { bpm: 88,  root: 58, scale: 'dorian',   prog: [0, 3, 5, 4], seed: 91, lead: 'sine',     arp: 'sine',     drums: true,  echo: 0.55, arpRate: 4 },
+  bonus:   { bpm: 140, root: 64, scale: 'major',    prog: [0, 5, 3, 4], seed: 101, lead: 'square',  arp: 'triangle', drums: true,  echo: 0.15, arpRate: 4 },
+  finalboss: { bpm: 160, root: 47, scale: 'harmonic', prog: [0, 5, 1, 4], seed: 111, lead: 'sawtooth', arp: 'square', drums: true, echo: 0.1, arpRate: 4 },
   ending:  { bpm: 76,  root: 64, scale: 'major',    prog: [0, 3, 5, 4], seed: 55, lead: 'sine',     arp: 'triangle', drums: false, echo: 0.4,  arpRate: 2 },
 };
 

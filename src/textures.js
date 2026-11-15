@@ -298,6 +298,82 @@ function checker(a = 0xffffff, b = 0xffd84a) {
   return toTexture(canvas);
 }
 
+function basalt() {
+  const n = fbm(131, 4, 5), vein = fbm(132, 5, 3);
+  const a = hex(0x2a1c1c), b = hex(0x4a3030), glow = hex(0xff7a2a);
+  const { canvas } = paint(256, (u, v) => {
+    let c = mix(a, b, n(u, v));
+    const r = Math.abs(vein(u, v) - 0.5);
+    if (r < 0.03) c = mix(glow, c, r / 0.03);
+    return c;
+  });
+  return toTexture(canvas);
+}
+
+function lava() {
+  const n = fbm(141, 3, 5), n2 = fbm(142, 6, 3);
+  const a = hex(0xff3d00), b = hex(0xffc23a), d = hex(0x7a1500);
+  const { canvas } = paint(256, (u, v) => {
+    const t = n(u, v);
+    let c = mix(a, b, clamp01((t - 0.45) * 3));
+    const r = Math.abs(n2(u, v) - 0.5);
+    if (r < 0.06) c = mix(d, c, r / 0.06);
+    return c;
+  });
+  return toTexture(canvas);
+}
+
+function snow() {
+  const n = fbm(151, 6, 4);
+  const a = hex(0xdfeaf8), b = hex(0xffffff);
+  const r = rng(152);
+  const { canvas, ctx } = paint(256, (u, v) => mix(a, b, n(u, v)));
+  for (let i = 0; i < 120; i++) { ctx.fillStyle = 'rgba(180,210,255,0.5)'; ctx.fillRect(r() * 256, r() * 256, 2, 2); }
+  return toTexture(canvas);
+}
+
+function ice() {
+  const vor = voronoi(10, 161), n = fbm(162, 4, 3);
+  const a = hex(0x9fd8f5), b = hex(0xd8f4ff);
+  const { canvas } = paint(256, (u, v) => {
+    const [f1, f2] = vor(u, v);
+    let c = mix(a, b, n(u, v));
+    if (f2 - f1 < 0.012) c = mix([255, 255, 255], c, 0.3);
+    return c;
+  });
+  return toTexture(canvas);
+}
+
+function coral() {
+  const vor = voronoi(20, 171), n = fbm(172, 8, 3);
+  const a = hex(0xff7a8a), b = hex(0xffb36b), m = hex(0x5a2a4a);
+  const { canvas } = paint(256, (u, v) => {
+    const [f1, f2, id] = vor(u, v);
+    let c = mix(a, b, id * 0.6 + n(u, v) * 0.4);
+    if (f2 - f1 < 0.02) c = mix(m, c, 0.4);
+    const dot = clamp01(1 - f1 * 30);
+    return mix(c, [255, 240, 220], dot * 0.6);
+  });
+  return toTexture(canvas);
+}
+
+function seaRock() {
+  const n = fbm(181, 4, 5);
+  const a = hex(0x1f4a5a), b = hex(0x3a7a7a), c2 = hex(0x6fd8c8);
+  const { canvas } = paint(256, (u, v) => {
+    let c = mix(a, b, n(u, v));
+    return mix(c, c2, clamp01((n(u * 2 % 1, v) - 0.7) * 3) * 0.5);
+  });
+  return toTexture(canvas);
+}
+
+function water() {
+  const n = fbm(191, 3, 5);
+  const a = hex(0x0a3a5a), b = hex(0x2a8aa0);
+  const { canvas } = paint(256, (u, v) => mix(a, b, clamp01((n(u, v) - 0.3) * 2)));
+  return toTexture(canvas);
+}
+
 // ---------- Sprites ----------
 function radial(size, stops) {
   const c = document.createElement('canvas');
@@ -347,6 +423,18 @@ export function createTextures() {
     fog: fogSkin(),
     sand: sandStripes(),
     checker: checker(),
+    basalt: basalt(),
+    basaltTop: cobble([0x3a2a2a, 0x5a4040, 0x1a0e0e], 133, 16),
+    lava: lava(),
+    snow: snow(),
+    ice: ice(),
+    snowCliff: cliff([0x8aa0c0, 0xb8c8e0, 0x6a7a9a], 153),
+    sandstone: brick([0xd9b26a, 0xe8c888, 0x9a7440], 155),
+    sandTop: cobble([0xe8c888, 0xf2d9a0, 0xa88450], 156, 12),
+    coral: coral(),
+    seaRock: seaRock(),
+    water: water(),
+    clockTop: cobble([0x6a5a8a, 0x8a7aa8, 0x2a1f3a], 157, 10),
     glow: toTexture(radial(64, [[0, 'rgba(255,255,255,1)'], [0.35, 'rgba(255,255,255,0.5)'], [1, 'rgba(255,255,255,0)']]), false),
     puff: toTexture(radial(64, [[0, 'rgba(255,255,255,0.9)'], [0.6, 'rgba(255,255,255,0.4)'], [1, 'rgba(255,255,255,0)']]), false),
     sparkle: toTexture(sparkle(), false),
