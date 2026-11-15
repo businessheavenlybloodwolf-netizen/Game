@@ -6,6 +6,8 @@ aus Grundformen gebaut und Musik und Soundeffekte live mit der WebAudio-API synt
 
 ## Spielen
 
+**Boss-Anleitung:** siehe [BOSS-ANLEITUNG.md](BOSS-ANLEITUNG.md).
+
 **Veröffentlichen auf Steam / itch.io:** siehe [PUBLISHING.md](PUBLISHING.md) – `npm run package` baut die HTML5-Version für itch.io
 sowie Desktop-Versionen für Windows, Linux/Steam Deck und macOS. Fertige Store-Grafiken liegen in `store/`.
 
