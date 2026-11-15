@@ -1,0 +1,10 @@
+"DepotBuild"
+{
+	"DepotID" "DEIN_DEPOT_WINDOWS"
+	"FileMapping"
+	{
+		"LocalPath" "LUMI-win32-x64/*"
+		"DepotPath" "."
+		"Recursive" "1"
+	}
+}

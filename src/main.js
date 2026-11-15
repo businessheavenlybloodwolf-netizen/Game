@@ -76,7 +76,9 @@ class Game {
     });
 
     const params = new URLSearchParams(location.search);
-    if (params.has('w')) {
+    if (params.has('lang')) setLang(params.get('lang'));
+    if (params.has('promo')) { this.applyLangToDom(); this.startPromo(params); }
+    else if (params.has('w')) {
       this.startLevel(+params.get('w') || 0, +params.get('l') || 0, true);
     } else this.toTitle();
     this.last = performance.now();
@@ -132,7 +134,7 @@ class Game {
     if (i === BONUS_IDX) return t('ui.needKey');
     return t('ui.needLevels');
   }
-  hasProgress() { return Object.keys(this.save.levels).length > 0; }
+  hasProgress() { return Object.values(this.save.levels).some((r) => r.done || r.ms.some((v) => v)) || Object.keys(this.save.seen).length > 0; }
 
   // ---------------- Speicherstand ----------------
   loadSave() {
@@ -174,6 +176,8 @@ class Game {
     items.push({ label: `${t('ui.language')}: ${LANGS[getLang()].name}`, action: () => this.langMenu(() => this.toTitle()) });
     items.push({ label: t('ui.controls'), action: () => this.showControls(() => this.toTitle()) });
     items.push({ label: `${t('ui.sound')}: ${this.audio.muted ? t('ui.off') : t('ui.on')}`, action: () => { this.audio.toggleMute(); this.toTitle(); } });
+    items.push({ label: t('ui.fullscreen'), action: () => { this.toggleFullscreen(); } });
+    if (window.lumiDesktop) items.push({ label: t('ui.quit'), action: () => window.lumiDesktop.quit() });
     this.hud.showMenu({ cls: 'title-screen', title: '<span class="logo">LUMI</span>', subtitle: t('ui.subtitle'), items });
   }
 
@@ -326,9 +330,51 @@ class Game {
         { label: t('ui.controls'), action: () => this.showControls(again) },
         { label: `${t('ui.language')}: ${LANGS[getLang()].name}`, action: () => this.langMenu(again) },
         { label: `${t('ui.sound')}: ${this.audio.muted ? t('ui.off') : t('ui.on')}`, action: () => { this.audio.toggleMute(); again(); } },
+        { label: t('ui.fullscreen'), action: () => this.toggleFullscreen() },
         { label: t('ui.mainMenu'), action: () => { this.hud.hideMenu(); this.toTitle(); } },
       ],
     });
+  }
+
+  toggleFullscreen() {
+    try {
+      if (window.lumiDesktop) { window.lumiDesktop.toggleFullscreen(); return; }
+      if (document.fullscreenElement) document.exitFullscreen();
+      else document.documentElement.requestFullscreen().catch(() => {});
+    } catch (e) { /* nicht erlaubt */ }
+  }
+
+  // Präsentationsmodus für Store-Grafiken: ?promo=1&w=..&l=..&a=winkel&d=abstand&h=höhe&logo=center|left|none
+  startPromo(p) {
+    const w = +p.get('w') || 0, i = +p.get('l') || 0;
+    this.star = p.get('star') === '1';
+    this.loadLevel(w, i);
+    this.state = 'promo';
+    this.hud.show(false);
+    this.setTouch(false);
+    document.getElementById('dialog').style.display = 'none';
+    this.promo = { a: +(p.get('a') || 0.5), d: +(p.get('d') || 9), h: +(p.get('h') || 3), fx: +(p.get('fx') || 0), fz: +(p.get('fz') || 0), look: +(p.get('ly') || 1.2) };
+    const pl = this.player; const sp = this.level.spawnPoint;
+    pl.reset(sp.x + this.promo.fx, sp.y, sp.z + this.promo.fz, p.has('face') ? +p.get('face') : this.promo.a);
+    for (const cp of this.level.checkpoints) cp.mesh.visible = false;
+    if (p.has('boss') && this.level.boss) {
+      // hinter Lumi an der Arena-Kante, Blick auf den Boss
+      const b = this.level.boss, c = b.center;
+      const cp = this.level.checkpoints[this.level.checkpoints.length - 1];
+      const dx = cp.x - c.x, dz = cp.z - c.z, l = Math.hypot(dx, dz);
+      pl.reset(c.x + dx / l * 4.5, c.y, c.z + dz / l * 4.5, Math.atan2(-dx, -dz));
+      this.promo.a = Math.atan2(dx, dz);
+      b.pos.set(c.x, b.top + 6.5, c.z);
+      b.mesh.rotation.y = Math.atan2(dx, dz);
+      b.state = 'promo';
+    }
+    const logo = p.get('logo') || 'none';
+    if (logo !== 'none') {
+      const el = document.createElement('div');
+      el.className = 'promo-logo ' + logo;
+      el.innerHTML = `<span class="logo">LUMI</span><div class="promo-sub">${p.get('sub') === '0' ? '' : t('ui.subtitle')}</div>`;
+      document.body.appendChild(el);
+    }
   }
 
   resume() {
@@ -665,6 +711,12 @@ class Game {
   updateCamera(dt) {
     const cam = this.camera, p = this.player.pos;
     const ci = this.input.camera();
+    if (this.state === 'promo') {
+      const pr = this.promo, p0 = this.player.pos;
+      cam.position.set(p0.x + Math.sin(pr.a) * pr.d, p0.y + pr.h, p0.z + Math.cos(pr.a) * pr.d);
+      cam.lookAt(p0.x, p0.y + pr.look, p0.z);
+      return;
+    }
     if (this.state === 'title' || this.state === 'map' || this.state === 'ending' || (this.state === 'story' && !this.hud.el.hud.classList.contains('show'))) {
       const t = performance.now() / 1000;
       let c = this.level.spawnPoint, dist = 16, h = 5;

@@ -1,6 +1,7 @@
 export default {
   name: 'English',
   ui: {
+    fullscreen: 'Fullscreen', quit: 'Quit game',
     starPaths: 'Star Paths', normalPaths: 'Normal Paths', starUnlocked: 'The Star Paths are open: 56 new, harder levels await!',
     subtitle: 'and the Dawnlight', newGame: 'New Adventure', continue: 'Continue', worldMap: 'World Map', controls: 'Controls',
     sound: 'Sound', on: 'On', off: 'Off', language: 'Language', back: 'Back', resume: 'Resume', restartLevel: 'Restart level',

@@ -1,6 +1,7 @@
 export default {
   name: 'Deutsch',
   ui: {
+    fullscreen: 'Vollbild', quit: 'Spiel beenden',
     starPaths: 'Sternenpfade', normalPaths: 'Normale Pfade', starUnlocked: 'Die Sternenpfade sind offen: 56 neue, schwerere Level warten!',
     subtitle: 'und das Morgenlicht', newGame: 'Neues Abenteuer', continue: 'Fortsetzen', worldMap: 'Weltkarte', controls: 'Steuerung',
     sound: 'Ton', on: 'An', off: 'Aus', language: 'Sprache', back: 'Zurück', resume: 'Weiterspielen', restartLevel: 'Level neu starten',

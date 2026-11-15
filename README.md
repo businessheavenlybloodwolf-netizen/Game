@@ -6,6 +6,9 @@ aus Grundformen gebaut und Musik und Soundeffekte live mit der WebAudio-API synt
 
 ## Spielen
 
+**Veröffentlichen auf Steam / itch.io:** siehe [PUBLISHING.md](PUBLISHING.md) – `npm run package` baut die HTML5-Version für itch.io
+sowie Desktop-Versionen für Windows, Linux/Steam Deck und macOS. Fertige Store-Grafiken liegen in `store/`.
+
 - **Am einfachsten:** `lumi.html` doppelt anklicken. Das ist eine einzige Datei, sie läuft offline in jedem modernen Browser.
 - Alternativ `index.html` (lädt `game.js` aus demselben Ordner).
 
@@ -66,7 +69,10 @@ Fortschritt wird im Browser gespeichert (`localStorage`). Mit `lumi.html?w=4&l=0
 
 ```bash
 npm install
-npm run build   # erzeugt game.js, index.html und lumi.html aus src/
+npm run build     # erzeugt game.js, index.html und lumi.html aus src/
+npm run package   # Release-Pakete (itch.io-ZIP, Windows, Linux, macOS) nach ./release
+npm run icons     # App-Icons aus assets/icon.svg
+node tools/store-art.cjs   # Store-Grafiken nach ./store
 ```
 
 | Datei | Inhalt |

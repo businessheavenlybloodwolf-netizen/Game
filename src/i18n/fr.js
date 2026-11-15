@@ -1,6 +1,7 @@
 export default {
   name: 'Français',
   ui: {
+    fullscreen: 'Plein écran', quit: 'Quitter le jeu',
     starPaths: 'Sentiers étoilés', normalPaths: 'Sentiers normaux', starUnlocked: 'Les sentiers étoilés sont ouverts : 56 nouveaux niveaux plus difficiles t\'attendent !',
     subtitle: 'et la Lumière de l\'Aube', newGame: 'Nouvelle aventure', continue: 'Continuer', worldMap: 'Carte du monde', controls: 'Commandes',
     sound: 'Son', on: 'Oui', off: 'Non', language: 'Langue', back: 'Retour', resume: 'Reprendre', restartLevel: 'Recommencer le niveau',

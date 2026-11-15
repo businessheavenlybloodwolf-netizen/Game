@@ -1,6 +1,7 @@
 export default {
   name: 'Italiano',
   ui: {
+    fullscreen: 'Schermo intero', quit: 'Esci dal gioco',
     starPaths: 'Sentieri stellari', normalPaths: 'Sentieri normali', starUnlocked: 'I sentieri stellari sono aperti: ti aspettano 56 nuovi livelli più difficili!',
     subtitle: 'e la Luce dell\'Alba', newGame: 'Nuova avventura', continue: 'Continua', worldMap: 'Mappa del mondo', controls: 'Comandi',
     sound: 'Audio', on: 'Sì', off: 'No', language: 'Lingua', back: 'Indietro', resume: 'Riprendi', restartLevel: 'Ricomincia livello',

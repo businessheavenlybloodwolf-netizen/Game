@@ -285,6 +285,12 @@ function fogSkin() {
   return toTexture(canvas);
 }
 
+function fogGray() {
+  const n = fbm(112, 4, 4);
+  const { canvas } = paint(128, (u, v) => { const t = 150 + n(u, v) * 105; return [t, t, t]; });
+  return toTexture(canvas);
+}
+
 function sandStripes() {
   const n = fbm(121, 4, 3);
   const a = hex(0xf6e2b3), b = hex(0xe9c98a);
@@ -421,6 +427,7 @@ export function createTextures() {
     cloudSeaDusk: cloudSea([0x6b5a9a, 0xb9a7e0]),
     cloudSeaNight: cloudSea([0x1b1230, 0x3d2a5c]),
     fog: fogSkin(),
+    fogGray: fogGray(),
     sand: sandStripes(),
     checker: checker(),
     basalt: basalt(),

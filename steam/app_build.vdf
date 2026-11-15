@@ -1,0 +1,14 @@
+"AppBuild"
+{
+	"AppID" "DEINE_APP_ID"
+	"Desc" "LUMI 1.0.0"
+	"ContentRoot" "../release/build/"
+	"BuildOutput" "../release/steam-output/"
+	"SetLive" ""
+	"Depots"
+	{
+		"DEIN_DEPOT_WINDOWS" "depot_windows.vdf"
+		"DEIN_DEPOT_LINUX" "depot_linux.vdf"
+		"DEIN_DEPOT_MAC" "depot_mac.vdf"
+	}
+}

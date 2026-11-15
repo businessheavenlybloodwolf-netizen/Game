@@ -1,6 +1,7 @@
 export default {
   name: 'Türkçe',
   ui: {
+    fullscreen: 'Tam ekran', quit: 'Oyundan çık',
     starPaths: 'Yıldız Yolları', normalPaths: 'Normal Yollar', starUnlocked: 'Yıldız Yolları açıldı: seni 56 yeni ve daha zor bölüm bekliyor!',
     subtitle: 've Şafak Işığı', newGame: 'Yeni macera', continue: 'Devam et', worldMap: 'Dünya haritası', controls: 'Kontroller',
     sound: 'Ses', on: 'Açık', off: 'Kapalı', language: 'Dil', back: 'Geri', resume: 'Oyuna dön', restartLevel: 'Bölümü yeniden başlat',

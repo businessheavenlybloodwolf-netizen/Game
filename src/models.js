@@ -125,7 +125,7 @@ function eyes(parent, y, z, spread, size, color = 0xffe14a) {
 export function createNebling(tint) {
   const root = new THREE.Group();
   const body = new THREE.Group(); root.add(body);
-  const m = toon(tint ?? 0x8f72c8, { map: T.fog });
+  const m = toon(tint ?? 0x8f72c8, { map: tint ? T.fogGray : T.fog });
   const b = mesh(new THREE.SphereGeometry(0.6, 20, 14), m, 0, 0.55, 0, body); b.scale.set(1, 0.9, 1);
   const top = mesh(new THREE.SphereGeometry(0.28, 12, 10), m, 0.1, 1.05, -0.05, body);
   eyes(body, 0.68, 0.52, 0.2, 0.1);
@@ -169,7 +169,7 @@ export function createDornling(tint) {
 export function createFlatterling(tint) {
   const root = new THREE.Group();
   const body = new THREE.Group(); root.add(body);
-  const m = toon(tint ?? 0x5b3f8f, { map: T.fog });
+  const m = toon(tint ?? 0x5b3f8f, { map: tint ? T.fogGray : T.fog });
   const b = mesh(new THREE.SphereGeometry(0.45, 18, 12), m, 0, 0, 0, body);
   eyes(body, 0.08, 0.4, 0.16, 0.08);
   const wingM = toon(0x9a7fd1);
@@ -191,7 +191,9 @@ export function createBoss(cfg = {}) {
   const root = new THREE.Group();
   const body = new THREE.Group(); root.add(body);
   const style = cfg.style || 'crown';
-  const m = toon(cfg.color ?? 0x9a7ad8, { map: T.fog, emissive: 0x2a1048, ei: 1, unique: true });
+  const base = new THREE.Color(cfg.color ?? 0x9a7ad8);
+  const m = toon(base.getHex(), { map: cfg.color ? T.fogGray : T.fog, emissive: base.clone().multiplyScalar(0.18).getHex(), ei: 1, unique: true });
+  m.userData.baseEmissive = m.emissive.getHex();
   const b = mesh(new THREE.SphereGeometry(2.3, 32, 24), m, 0, 2.2, 0, body); b.scale.set(1, 0.92, 1);
   // Kopfschmuck je nach Boss
   const accM = toon(cfg.accent ?? 0x2b1a40, { emissive: cfg.accentGlow ?? 0x6a2fa0, ei: 0.3 });

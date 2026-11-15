@@ -1,6 +1,7 @@
 export default {
   name: 'Español',
   ui: {
+    fullscreen: 'Pantalla completa', quit: 'Salir del juego',
     starPaths: 'Senderos estelares', normalPaths: 'Senderos normales', starUnlocked: '¡Los senderos estelares están abiertos: te esperan 56 niveles nuevos y más difíciles!',
     subtitle: 'y la Luz del Alba', newGame: 'Nueva aventura', continue: 'Continuar', worldMap: 'Mapa del mundo', controls: 'Controles',
     sound: 'Sonido', on: 'Sí', off: 'No', language: 'Idioma', back: 'Volver', resume: 'Seguir jugando', restartLevel: 'Reiniciar nivel',

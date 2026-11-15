@@ -51,11 +51,12 @@ export class Boss {
     u.puffs.rotation.y += dt * 0.6;
     u.gem.rotation.y += dt * 1.5;
     u.hands.forEach((h, i) => { h.position.y = 1.6 + Math.sin(time * 2 + i * 2) * 0.3; });
-    if (this.flash > 0) { this.flash -= dt; u.mat.emissive.set(Math.floor(this.flash * 20) % 2 ? 0xff4060 : 0x2a1048); }
-    else u.mat.emissive.set(this.state === 'dazed' ? 0x3a2060 : 0x2a1048);
+    const be = u.mat.userData.baseEmissive ?? 0x2a1048;
+    if (this.flash > 0) { this.flash -= dt; u.mat.emissive.set(Math.floor(this.flash * 20) % 2 ? 0xff4060 : be); }
+    else u.mat.emissive.set(be);
     // Pupillen folgen dem Spieler
     const toP = new THREE.Vector3(player.pos.x - this.pos.x, 0, player.pos.z - this.pos.z);
-    if (this.state !== 'dead') this.mesh.rotation.y += (Math.atan2(toP.x, toP.z) - this.mesh.rotation.y) * Math.min(1, dt * 3);
+    if (this.state !== 'dead' && this.state !== 'promo') this.mesh.rotation.y += (Math.atan2(toP.x, toP.z) - this.mesh.rotation.y) * Math.min(1, dt * 3);
 
     const c = this.center;
     switch (this.state) {

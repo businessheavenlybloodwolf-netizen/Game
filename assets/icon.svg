@@ -1,0 +1,47 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <defs>
+    <linearGradient id="sky" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#4a7ae8"/><stop offset="0.55" stop-color="#c890e0"/><stop offset="1" stop-color="#ffc0a0"/>
+    </linearGradient>
+    <radialGradient id="glow" cx="0.5" cy="0.5" r="0.5">
+      <stop offset="0" stop-color="#fff3b0" stop-opacity="0.95"/><stop offset="0.5" stop-color="#ffb050" stop-opacity="0.35"/><stop offset="1" stop-color="#ffb050" stop-opacity="0"/>
+    </radialGradient>
+    <radialGradient id="body" cx="0.42" cy="0.38" r="0.65">
+      <stop offset="0" stop-color="#fffaf0"/><stop offset="0.7" stop-color="#fff1d6"/><stop offset="1" stop-color="#f5c98a"/>
+    </radialGradient>
+    <linearGradient id="flame" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#ffe066"/><stop offset="1" stop-color="#ff8a2a"/>
+    </linearGradient>
+  </defs>
+  <rect x="8" y="8" width="496" height="496" rx="110" fill="url(#sky)" stroke="#3a1f14" stroke-width="14"/>
+  <ellipse cx="256" cy="470" rx="230" ry="60" fill="#fff" opacity="0.75"/>
+  <ellipse cx="120" cy="455" rx="110" ry="40" fill="#fff"/>
+  <ellipse cx="400" cy="460" rx="120" ry="42" fill="#fff"/>
+  <circle cx="256" cy="250" r="200" fill="url(#glow)"/>
+  <!-- Flamme -->
+  <path d="M256 52 C300 110 300 150 256 178 C212 150 212 110 256 52Z" fill="url(#flame)" stroke="#3a1f14" stroke-width="9" stroke-linejoin="round"/>
+  <path d="M256 104 C272 128 272 146 256 160 C240 146 240 128 256 104Z" fill="#fff8c0"/>
+  <!-- Deckel -->
+  <rect x="216" y="168" width="80" height="26" rx="8" fill="#5a2e1e" stroke="#3a1f14" stroke-width="8"/>
+  <!-- Körper -->
+  <ellipse cx="256" cy="300" rx="132" ry="122" fill="url(#body)" stroke="#3a1f14" stroke-width="10"/>
+  <path d="M130 262 Q256 282 382 262" fill="none" stroke="#8a4b2a" stroke-width="7" stroke-linecap="round"/>
+  <path d="M124 300 Q256 322 388 300" fill="none" stroke="#8a4b2a" stroke-width="7" stroke-linecap="round" opacity="0.6"/>
+  <path d="M132 344 Q256 364 380 344" fill="none" stroke="#8a4b2a" stroke-width="7" stroke-linecap="round"/>
+  <!-- Schal -->
+  <path d="M152 222 Q256 262 360 222 L366 252 Q256 292 146 252Z" fill="#2fb5a8" stroke="#3a1f14" stroke-width="8" stroke-linejoin="round"/>
+  <path d="M320 256 L362 330 L330 336 L300 266Z" fill="#24978c" stroke="#3a1f14" stroke-width="8" stroke-linejoin="round"/>
+  <!-- Gesicht -->
+  <ellipse cx="214" cy="306" rx="17" ry="25" fill="#1a1020"/>
+  <ellipse cx="298" cy="306" rx="17" ry="25" fill="#1a1020"/>
+  <circle cx="220" cy="296" r="6" fill="#fff"/><circle cx="304" cy="296" r="6" fill="#fff"/>
+  <ellipse cx="182" cy="340" rx="20" ry="11" fill="#ff9aa8"/><ellipse cx="330" cy="340" rx="20" ry="11" fill="#ff9aa8"/>
+  <path d="M240 340 Q256 356 272 340" fill="none" stroke="#1a1020" stroke-width="7" stroke-linecap="round"/>
+  <!-- Füßchen -->
+  <ellipse cx="214" cy="420" rx="28" ry="14" fill="#4a2a1e" stroke="#3a1f14" stroke-width="6"/>
+  <ellipse cx="298" cy="420" rx="28" ry="14" fill="#4a2a1e" stroke="#3a1f14" stroke-width="6"/>
+  <!-- Funken -->
+  <path d="M96 120 l8 18 18 8 -18 8 -8 18 -8 -18 -18 -8 18 -8z" fill="#fff6c0"/>
+  <path d="M410 96 l6 13 13 6 -13 6 -6 13 -6 -13 -13 -6 13 -6z" fill="#fff6c0"/>
+  <path d="M420 190 l4 9 9 4 -9 4 -4 9 -4 -9 -9 -4 9 -4z" fill="#fff"/>
+</svg>
