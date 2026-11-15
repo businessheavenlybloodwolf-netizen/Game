@@ -142,3 +142,15 @@ html, body { margin: 0; height: 100%; overflow: hidden; background: #1a1020; fon
 .promo-logo .logo { font-size: 22vmin; animation: none; }
 .promo-logo.small .logo { font-size: 30vmin; }
 .promo-logo .promo-sub { font-weight: 900; font-size: 5.5vmin; color: #fff1d6; text-shadow: 0 0.6vmin 0 #3a1f14, 0.4vmin 0 0 #3a1f14, -0.4vmin 0 0 #3a1f14, 0 -0.4vmin 0 #3a1f14; letter-spacing: 0.4vmin; }
+
+#prompt { position: absolute; left: 50%; bottom: 110px; transform: translateX(-50%) scale(.9); background: rgba(40,20,50,.8); border: 3px solid #fff1d6; border-radius: 16px; padding: 8px 16px; font-weight: 900; font-size: 19px; opacity: 0; transition: all .2s; white-space: nowrap; }
+#prompt.show { opacity: 1; transform: translateX(-50%) scale(1); }
+#prompt .key { display: inline-block; background: #fff1d6; color: #3a1f14; border-radius: 8px; padding: 1px 8px; margin-right: 6px; font-size: 15px; }
+#race { position: absolute; left: 50%; top: 14%; transform: translateX(-50%); font-weight: 900; font-size: 54px; color: #6fe8d8; text-shadow: 0 4px 0 #1a3a3a, 3px 0 0 #1a3a3a, -3px 0 0 #1a3a3a; opacity: 0; }
+#race.show { opacity: 1; }
+#touch [data-btn="act"] { right: calc(5vw + 104px); bottom: calc(6vh + 92px); width: 60px; height: 60px; font-size: 26px; display: none; background: #ffe066; }
+#touch [data-btn="act"].show { display: flex; }
+.mlist { display: grid; grid-template-columns: repeat(auto-fill, minmax(210px, 1fr)); gap: 4px 12px; text-align: left; font-size: 14px; max-height: 50vh; overflow: auto; }
+.mlist .mrow { opacity: .55; }
+.mlist .mrow.got { opacity: 1; }
+#moons small { font-size: 13px; opacity: .8; margin-left: 2px; }

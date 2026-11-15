@@ -1,5 +1,6 @@
 // Alle Figuren & Objekte werden aus Grundformen gebaut (eigener Stil: rundlich, Toon-Shading, Outline).
 import * as THREE from 'three';
+import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 
 let T = null;
 const matCache = new Map();
@@ -22,6 +23,38 @@ export function basic(color, opts = {}) {
 }
 
 const outlineMat = new THREE.MeshBasicMaterial({ color: 0x1a1020, side: THREE.BackSide });
+
+// Verschmilzt alle Meshes einer Gruppe (ohne die in "skip") pro Material zu je einem Mesh – weniger Draw Calls
+export function compactGroup(group, skip = []) {
+  group.updateMatrixWorld(true);
+  const inv = group.matrixWorld.clone().invert();
+  const skipSet = new Set();
+  for (const sk of skip) sk.traverse((o) => skipSet.add(o));
+  const buckets = new Map();
+  const remove = [];
+  group.traverse((o) => {
+    if (!o.isMesh || skipSet.has(o) || o === group) return;
+    const mat = o.material;
+    if (Array.isArray(mat)) return;
+    const g = o.geometry.index ? o.geometry.toNonIndexed() : o.geometry.clone();
+    for (const k of Object.keys(g.attributes)) if (!['position', 'normal', 'uv'].includes(k)) g.deleteAttribute(k);
+    if (!g.attributes.uv) g.setAttribute('uv', new THREE.Float32BufferAttribute(new Float32Array(g.attributes.position.count * 2), 2));
+    if (!g.attributes.normal) g.computeVertexNormals();
+    g.applyMatrix4(new THREE.Matrix4().multiplyMatrices(inv, o.matrixWorld));
+    const key = mat.uuid + '|' + o.castShadow;
+    if (!buckets.has(key)) buckets.set(key, { mat, cast: o.castShadow, geos: [] });
+    buckets.get(key).geos.push(g);
+    remove.push(o);
+  });
+  for (const o of remove) if (o.parent) o.parent.remove(o);
+  for (const b of buckets.values()) {
+    const m = new THREE.Mesh(mergeGeometries(b.geos, false), b.mat);
+    m.castShadow = b.cast;
+    m.userData.noOutline = true;
+    group.add(m);
+  }
+  return group;
+}
 
 function mesh(geo, mat, x = 0, y = 0, z = 0, parent = null) {
   const m = new THREE.Mesh(geo, mat);
@@ -138,6 +171,7 @@ export function createNebling(tint) {
     p.userData.noOutline = true; p.castShadow = false;
   }
   addOutline(b, 0.04); addOutline(top, 0.04);
+  compactGroup(body);
   root.userData = { body };
   return root;
 }
@@ -162,6 +196,7 @@ export function createDornling(tint) {
   }
   eyes(body, 0.66, 0.5, 0.18, 0.09, 0xffffff);
   addOutline(b, 0.04);
+  compactGroup(body);
   root.userData = { body };
   return root;
 }
@@ -183,6 +218,7 @@ export function createFlatterling(tint) {
   mesh(ear, m, -0.18, 0.45, 0, body).rotation.z = 0.3;
   mesh(ear, m, 0.18, 0.45, 0, body).rotation.z = -0.3;
   addOutline(b, 0.04);
+  compactGroup(body, wings);
   root.userData = { body, wings };
   return root;
 }
@@ -329,6 +365,7 @@ export function createCheckpoint() {
   mesh(new THREE.CylinderGeometry(0.1, 0.14, 0.08, 10), toon(0x4a2a1e), 0, 0.3, 0, lamp);
   const flame = glowSprite(0xffb050, 1.6, 0); lamp.add(flame);
   addOutline(root, 0.03);
+  compactGroup(root, [lamp]);
   root.userData = { lampMat: lm, flame, lamp };
   return root;
 }
@@ -346,6 +383,7 @@ export function createBouncer(color = 0xff7ab8) {
   }
   mesh(new THREE.CylinderGeometry(0.6, 0.65, 0.25, 16), toon(0xffe066, { emissive: 0xffa000, ei: 0.25 }), 0, 0.6, 0, pad);
   addOutline(root, 0.03);
+  compactGroup(pad); compactGroup(root, [pad]);
   root.userData = { pad };
   return root;
 }
@@ -450,21 +488,26 @@ export function createAirship(rand) {
     const p = mesh(new THREE.BoxGeometry(0.06, 0.9, 0.18), toon(0xe2b75e), 0, 0, 0, prop); p.rotation.x = i / 3 * Math.PI * 2;
   }
   addOutline(root, 0.05);
+  compactGroup(root, [prop]);
   root.userData = { prop };
   return root;
 }
 
 export function createCloud(rand, color = 0xffffff, opacity = 0.95) {
-  const root = new THREE.Group();
+  // alle Kugeln einer Wolke zu einem Mesh verschmolzen (1 Draw Call pro Wolke)
   const m = toon(color, { transparent: opacity < 1, opacity });
   const n = 4 + Math.floor(rand() * 4);
+  const geos = [];
   for (let i = 0; i < n; i++) {
     const r = 1 + rand() * 1.6;
-    const s = mesh(new THREE.SphereGeometry(r, 12, 10), m, (i - n / 2) * 1.4 + rand(), rand() * 0.8, (rand() - 0.5) * 1.5);
-    s.castShadow = false;
-    s.scale.y = 0.7;
-    root.add(s);
+    const g = new THREE.SphereGeometry(r, 12, 10);
+    g.scale(1, 0.7, 1);
+    g.translate((i - n / 2) * 1.4 + rand(), rand() * 0.8, (rand() - 0.5) * 1.5);
+    geos.push(g);
   }
+  const merged = mergeGeometries(geos, false);
+  const root = new THREE.Mesh(merged, m);
+  root.castShadow = false;
   return root;
 }
 
@@ -569,5 +612,31 @@ export function createSnowman(rand) {
   mesh(new THREE.CylinderGeometry(0.25, 0.28, 0.35, 12), toon(0x2a2a3a), 0, 1.8, 0, root);
   addOutline(root, 0.03);
   root.rotation.y = rand() * 6;
+  return root;
+}
+
+// Glimmlinge: die kleinen Laternenleute von Lumeria
+export function createGlimmling(color = 0xffb3d1) {
+  const root = new THREE.Group();
+  const body = new THREE.Group(); root.add(body);
+  const paper = toon(color, { emissive: color, ei: 0.15 });
+  const S = new THREE.SphereGeometry(1, 18, 12);
+  const b = mesh(S, paper, 0, 0.45, 0, body); b.scale.set(0.36, 0.38, 0.36);
+  const rib = toon(0x6a3e22);
+  const t1 = mesh(new THREE.TorusGeometry(0.35, 0.02, 6, 24), rib, 0, 0.45, 0, body); t1.rotation.x = Math.PI / 2; t1.userData.noOutline = true;
+  mesh(new THREE.CylinderGeometry(0.22, 0.26, 0.08, 12), toon(0x4a2a1e), 0, 0.84, 0, body);
+  // Mütze
+  const hat = mesh(new THREE.ConeGeometry(0.24, 0.45, 12), toon(0x2fb5a8), 0, 1.08, 0, body); hat.rotation.z = 0.25;
+  mesh(new THREE.SphereGeometry(0.07, 8, 6), toon(0xfff1d6), -0.1, 1.3, 0, body);
+  const eyeM = toon(0x1a1020);
+  for (const sx of [-1, 1]) {
+    const e = mesh(S, eyeM, sx * 0.11, 0.5, 0.32, body); e.scale.set(0.045, 0.065, 0.03); e.userData.noOutline = true;
+    const c = mesh(S, toon(0xff9aa8), sx * 0.2, 0.4, 0.27, body); c.scale.set(0.05, 0.03, 0.02); c.userData.noOutline = true;
+    const f = mesh(S, toon(0x4a2a1e), sx * 0.13, 0.06, 0.03, root); f.scale.set(0.09, 0.06, 0.12);
+  }
+  addOutline(body, 0.03);
+  compactGroup(body);
+  root.add(glowSprite(0xffd090, 1.6, 0.35));
+  root.userData = { body };
   return root;
 }

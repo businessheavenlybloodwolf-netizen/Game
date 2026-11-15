@@ -60,19 +60,27 @@ const hex = (h) => [(h >> 16) & 255, (h >> 8) & 255, h & 255];
 const mix = (a, b, t) => [a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t, a[2] + (b[2] - a[2]) * t];
 const clamp01 = (x) => Math.max(0, Math.min(1, x));
 
+// Texturqualität: 1 = Standard (256 px), 2 = Ultra (512 px). Vektorzeichnungen werden mitskaliert.
+let Q = 1;
+let ANISO = 4;
+export function setAnisotropy(a) { ANISO = a; }
+export function setTextureQuality(q) { Q = q; }
+
 function paint(size, fn) {
+  const S = Math.round(size * Q);
   const c = document.createElement('canvas');
-  c.width = c.height = size;
+  c.width = c.height = S;
   const ctx = c.getContext('2d');
-  const img = ctx.createImageData(size, size);
-  for (let y = 0; y < size; y++) {
-    for (let x = 0; x < size; x++) {
-      const col = fn(x / size, y / size, x, y);
-      const i = (y * size + x) * 4;
+  const img = ctx.createImageData(S, S);
+  for (let y = 0; y < S; y++) {
+    for (let x = 0; x < S; x++) {
+      const col = fn(x / S, y / S, Math.floor(x / Q), Math.floor(y / Q));
+      const i = (y * S + x) * 4;
       img.data[i] = col[0]; img.data[i + 1] = col[1]; img.data[i + 2] = col[2]; img.data[i + 3] = col[3] ?? 255;
     }
   }
   ctx.putImageData(img, 0, 0);
+  ctx.scale(Q, Q);
   return { canvas: c, ctx };
 }
 
@@ -80,7 +88,7 @@ function toTexture(canvas, repeat = true) {
   const t = new THREE.CanvasTexture(canvas);
   t.colorSpace = THREE.SRGBColorSpace;
   if (repeat) { t.wrapS = t.wrapT = THREE.RepeatWrapping; }
-  t.anisotropy = 4;
+  t.anisotropy = ANISO;
   t.needsUpdate = true;
   return t;
 }

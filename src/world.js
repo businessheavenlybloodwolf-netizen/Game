@@ -5,7 +5,8 @@ import { rng } from './textures.js';
 import { boxCollider, cylCollider, moveCollider, overlapXZ } from './physics.js';
 import { Boss } from './boss.js';
 import { WORLDS } from './worlds.js';
-import { generateLevel } from './generator.js';
+import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
+import { generateLevel, generateKingdom } from './generator.js';
 
 const SURF = {
   grass: ['grass', 'dirt'], meadow: ['grassPlain', 'dirt'], stone: ['stone', 'stone'],
@@ -55,12 +56,12 @@ function getStreakTex() {
 }
 
 const SKY_VS = `varying vec3 vDir; void main(){ vDir = normalize(position); vec4 p = projectionMatrix * modelViewMatrix * vec4(position,1.0); gl_Position = p.xyww; }`;
-const SKY_FS = `uniform vec3 top; uniform vec3 horizon; uniform vec3 bottom; uniform vec3 sunDir; uniform vec3 sunCol; uniform float stars; varying vec3 vDir;
+const SKY_FS = `uniform vec3 top; uniform vec3 horizon; uniform vec3 bottom; uniform vec3 sunDir; uniform vec3 sunCol; uniform float stars; uniform float linOut; varying vec3 vDir;
 float hash(vec3 p){ p = fract(p*0.3183099+.1); p*=17.0; return fract(p.x*p.y*p.z*(p.x+p.y+p.z)); }
 void main(){ vec3 d = normalize(vDir); float h = d.y; vec3 c = h > 0.0 ? mix(horizon, top, pow(h, 0.55)) : mix(horizon, bottom, pow(-h, 0.45));
  float s = max(dot(d, normalize(sunDir)), 0.0); c += sunCol * (pow(s, 200.0) * 1.5 + pow(s, 12.0) * 0.25);
  if (stars > 0.0 && h > 0.0) { vec3 q = floor(d * 220.0); float st = step(0.997, hash(q)); c += vec3(st) * stars * h; }
- gl_FragColor = vec4(c, 1.0); }`;
+ if (linOut > 0.5) c = pow(max(c, vec3(0.0)), vec3(2.2)); gl_FragColor = vec4(c, 1.0); }`;
 
 export class Level {
   constructor(spec, game) {
@@ -73,7 +74,11 @@ export class Level {
     this.gravity = W.gravity || 1;
     this.links = [];
     this.blinks = []; this.geysers = []; this.ghosts = []; this.moonstones = []; this.keyItem = null;
+    this.interactables = []; this.poundSpots = []; this.pieces = []; this.rings = null; this.lost = null; this.nests = [];
+    this.portals = []; this.labels = [];
+    this.idPrefix = spec.idPrefix || '';
     this.freeze = false;
+    this.staticRoots = [];
     this.T = game.T;
     this.group = new THREE.Group();
     this.colliders = [];
@@ -90,8 +95,73 @@ export class Level {
     this.mats = {};
     this.setupEnvironment();
     if (spec.build) spec.build(this);
+    else if (spec.kind === 'kingdom') generateKingdom(this, spec);
     else generateLevel(this, spec);
     this.par = this.par || 60;
+    this.bakeStatic();
+    this.buildSparkInstances();
+  }
+
+  // Unbewegliche Teile pro Material zu wenigen großen Meshes verschmelzen (spart tausende Draw Calls).
+  // Verschmolzen wird nur innerhalb von 60-m-Kacheln, damit Sicht- und Schatten-Culling weiter greifen.
+  bakeStatic() {
+    this.group.updateMatrixWorld(true);
+    const CELL = 60;
+    const sig = (g) => Object.keys(g.attributes).sort().join(',') + (g.index ? '|i' : '|n');
+    const pieces = [];
+    for (const root of this.staticRoots) {
+      if (root.userData.dyn) continue;
+      root.traverse((o) => {
+        if (!o.isMesh || o.userData.dyn) return;
+        const src = o.geometry;
+        if (!src.attributes.normal || !src.attributes.uv) return;
+        const mats = Array.isArray(o.material) ? o.material : [o.material];
+        if (mats.some((m) => m.transparent || m.type === 'ShaderMaterial')) return;
+        const base = src.clone();
+        for (const k of Object.keys(base.attributes)) if (!['position', 'normal', 'uv'].includes(k)) base.deleteAttribute(k);
+        base.applyMatrix4(o.matrixWorld);
+        base.computeBoundingSphere();
+        const c = base.boundingSphere.center;
+        const cell = Math.floor(c.x / CELL) + ':' + Math.floor(c.z / CELL);
+        const push = (geo, mat) => pieces.push({ geo, mat, obj: o, key: mat.uuid + '|' + sig(geo) + '|' + o.castShadow + o.receiveShadow + '|' + cell });
+        if (Array.isArray(o.material) && base.groups.length && base.index) {
+          for (const gr of base.groups) {
+            const part = new THREE.BufferGeometry();
+            for (const k of Object.keys(base.attributes)) part.setAttribute(k, base.attributes[k]);
+            part.setIndex(Array.from(base.index.array.slice(gr.start, gr.start + gr.count)));
+            push(part, o.material[gr.materialIndex]);
+          }
+        } else if (!Array.isArray(o.material)) {
+          base.clearGroups();
+          push(base, o.material);
+        }
+      });
+    }
+    const group = (list) => {
+      const m = new Map();
+      for (const p of list) { if (!m.has(p.key)) m.set(p.key, []); m.get(p.key).push(p); }
+      return m;
+    };
+    const mergeList = (list) => (list.length === 1 ? list[0].geo : mergeGeometries(list.map((p) => p.geo), false));
+    // Phase 1: welche Objekte lassen sich nicht vollständig verschmelzen?
+    const failed = new Set();
+    for (const list of group(pieces).values()) if (!mergeList(list)) for (const p of list) failed.add(p.obj);
+    // Phase 2: nur Teile von vollständig verschmelzbaren Objekten zusammenfügen
+    const ok = pieces.filter((p) => !failed.has(p.obj));
+    let merged = 0;
+    for (const list of group(ok).values()) {
+      const g = mergeList(list);
+      if (!g) continue;
+      const p0 = list[0];
+      const m = new THREE.Mesh(g, p0.mat);
+      m.castShadow = p0.obj.castShadow; m.receiveShadow = p0.obj.receiveShadow;
+      m.userData.baked = true;
+      this.group.add(m);
+      merged += list.length;
+    }
+    // Originale bleiben für die Kamera-Kollision im Szenengraph, werden aber nicht mehr gezeichnet
+    for (const p of ok) p.obj.visible = false;
+    this.bakedCount = merged;
   }
 
   surf(name) {
@@ -115,13 +185,15 @@ export class Level {
         top: { value: new THREE.Color(th.skyTop) }, horizon: { value: new THREE.Color(th.skyHorizon) },
         bottom: { value: new THREE.Color(th.skyBottom) }, sunDir: { value: sunDir }, sunCol: { value: new THREE.Color(th.sunColor || 0xfff2c0) },
         stars: { value: th.stars || 0 },
+        linOut: { value: this.game.gfx && this.game.gfx.composer ? 1 : 0 },
       },
     }));
     sky.renderOrder = -10;
     sky.frustumCulled = false;
     this.sky = sky;
     this.add(sky);
-    this.fog = new THREE.Fog(th.fog, th.fogNear, th.fogFar);
+    const fogK = (this.game.gfx ? this.game.gfx.p.fog : 1) * (this.spec.kind === 'kingdom' ? 1.5 : 1);
+    this.fog = new THREE.Fog(th.fog, th.fogNear * fogK, th.fogFar * fogK);
     const hemi = new THREE.HemisphereLight(th.hemiSky, th.hemiGround, th.hemiI ?? 1.6);
     this.add(hemi);
     const sun = new THREE.DirectionalLight(th.sunLight || 0xfff1d6, th.sunI ?? 2.6);
@@ -129,6 +201,7 @@ export class Level {
     sun.shadow.mapSize.set(2048, 2048);
     const sc = sun.shadow.camera; sc.left = sc.bottom = -28; sc.right = sc.top = 28; sc.near = 1; sc.far = 120;
     sun.shadow.bias = -0.0008; sun.shadow.normalBias = 0.03;
+    if (this.game.gfx) this.game.gfx.setupSun(sun);
     this.sun = sun; this.add(sun); this.add(sun.target);
     if (th.lavaY !== undefined) {
       const tex = this.T.lava.clone(); tex.needsUpdate = true; tex.repeat.set(80, 80);
@@ -162,7 +235,7 @@ export class Level {
     const m = new THREE.Mesh(geo, [s.side, s.side, s.top, s.side, s.side, s.side]);
     m.position.set(x, top - h / 2, z);
     m.castShadow = true; m.receiveShadow = true;
-    this.add(m);
+    this.add(m); this.staticRoots.push(m);
     if (o.under !== false && !o.noUnder) {
       const uh = o.underH ?? Math.min(w, d) * 0.9;
       const ug = new THREE.CylinderGeometry(1, 0.12, uh, 4, 1);
@@ -170,7 +243,7 @@ export class Level {
       um.rotation.y = Math.PI / 4;
       um.scale.set(w / Math.SQRT2, 1, d / Math.SQRT2);
       um.position.set(x, top - h - uh / 2, z);
-      this.add(um);
+      this.add(um); this.staticRoots.push(um);
     }
     const c = boxCollider(x - w / 2, top - h, z - d / 2, x + w / 2, top, z + d / 2, { mesh: m, ice: !!o.ice });
     if (!o.noCollide) this.colliders.push(c);
@@ -187,14 +260,14 @@ export class Level {
     const m = new THREE.Mesh(geo, [s.side, s.top, s.side]);
     m.position.set(x, top - h / 2, z);
     m.castShadow = true; m.receiveShadow = true;
-    this.add(m);
+    this.add(m); this.staticRoots.push(m);
     if (o.under !== false) {
       const uh = o.underH ?? r * 1.4;
       const ug = new THREE.CylinderGeometry(r * 0.94, r * 0.15, uh, Math.max(8, Math.round(r * 4)));
       cylUV(ug, r, 0, 0, 0, 4);
       const um = new THREE.Mesh(ug, s.side);
       um.position.set(x, top - h - uh / 2, z);
-      this.add(um);
+      this.add(um); this.staticRoots.push(um);
     }
     const c = cylCollider(x, z, r, top - h, top, { mesh: m, ice: !!o.ice });
     if (!o.noCollide) this.colliders.push(c);
@@ -216,6 +289,7 @@ export class Level {
     if (o.shape === 'cyl') p = this.cyl(from.x, from.y, from.z, o.r ?? 1.8, { mat: o.mat || 'wood', h, under: false });
     else p = this.box(from.x, from.y, from.z, o.w ?? 3.5, o.d ?? 3.5, { mat: o.mat || 'wood', h, under: false });
     // kleine Laternen-Markierung, damit man bewegte Plattformen erkennt
+    p.mesh.userData.dyn = true;
     const gem = new THREE.Mesh(new THREE.OctahedronGeometry(0.22), M.toon(0xffe066, { emissive: 0xffb000, ei: 0.6 }));
     gem.position.set(0, h / 2 + 0.05, 0); gem.scale.y = 0.5; p.mesh.add(gem);
     const mv = { ...p, from, to, period: o.period ?? 5, phase: (o.phase ?? 0) * (o.period ?? 5), pos: from.clone(), circle: o.circle || null };
@@ -226,6 +300,7 @@ export class Level {
 
   crumble(x, top, z, w = 3, d = 3) {
     const p = this.box(x, top, z, w, d, { mat: this.def.crumbleMat || 'stone', h: 0.7, under: false, noCam: true });
+    p.mesh.userData.dyn = true;
     p.mesh.material = p.mesh.material.map((m) => { const c = m.clone(); c.color = new THREE.Color(0xffd0a0); return c; });
     // Risse
     const crack = new THREE.Mesh(new THREE.BoxGeometry(w * 0.9, 0.05, 0.08), M.toon(0x2a1a10));
@@ -237,6 +312,7 @@ export class Level {
 
   crumbleCyl(x, top, z, r) {
     const p = this.cyl(x, top, z, r, { mat: this.def.crumbleMat || 'stone', h: 0.7, under: false, noCam: true });
+    p.mesh.userData.dyn = true;
     p.mesh.material = p.mesh.material.map((m) => { const c = m.clone(); c.color = new THREE.Color(0xffd0a0); return c; });
     const crack = new THREE.Mesh(new THREE.BoxGeometry(r * 1.6, 0.05, 0.08), M.toon(0x2a1a10));
     crack.position.y = 0.36; crack.rotation.y = 0.6; p.mesh.add(crack);
@@ -266,6 +342,7 @@ export class Level {
 
   blink(x, top, z, r, group = 0, period = 4) {
     const p = this.cyl(x, top, z, r, { mat: this.def.blinkMat || 'clock', h: 0.6, under: false, noCam: true });
+    p.mesh.userData.dyn = true;
     const col = group ? 0x6ad5ff : 0xff7ab8;
     const mat = M.toon(col, { emissive: col, ei: 0.35, transparent: true, opacity: 1, unique: true });
     p.mesh.material = mat;
@@ -283,19 +360,161 @@ export class Level {
 
   ghost(x, top, z, r) {
     const p = this.cyl(x, top, z, r, { mat: 'cloud', h: 0.5, under: false, noCam: true });
+    p.mesh.userData.dyn = true;
     const mat = new THREE.MeshToonMaterial({ color: 0xe8f0ff, emissive: 0x6a8aff, emissiveIntensity: 0.4, gradientMap: this.T.toonGradient, transparent: true, opacity: 0.0 });
     p.mesh.material = mat; p.mesh.castShadow = false;
     this.ghosts.push({ ...p, mat, x, y: top, z, vis: 0 });
     return p;
   }
 
-  moonstone(x, y, z, idx) {
-    const got = this.game.hasMoonstone(this.spec, idx);
+  // Mondsplitter in Herausforderungen: Index 0/1 = Geheimnisse, 2 = alle Funken
+  moonstone(x, y, z, idx) { const ms = this.moon(x, y, z, this.idPrefix + 'm' + idx); ms.idx = idx; return ms; }
+
+  // allgemeiner Mondsplitter mit fester ID (pro Reich)
+  moon(x, y, z, id) {
+    const got = this.game.hasMoon(this.spec.world, id);
     const m = M.createMoonstone(got);
     m.position.set(x, y, z); this.add(m);
-    const ms = { mesh: m, pos: m.position, idx, taken: false, base: y };
+    const ms = { mesh: m, pos: m.position, id, taken: false, base: y };
     this.moonstones.push(ms);
     return ms;
+  }
+
+  spawnMoon(p, id) {
+    if (this.moonstones.some((m) => m.id === id && !m.taken)) return;
+    const ms = this.moon(p.x, p.y, p.z, id);
+    this.game.audio.play('oneup');
+    this.game.particles.burst(ms.pos, { count: 24, color: [0x9ab8ff, 0xffffff], speed: 6, size: 0.8, tex: 'sparkle', additive: true });
+    return ms;
+  }
+
+  // ---------------- Open-World-Objekte ----------------
+  poundSpot(x, top, z, id) {
+    if (this.game.hasMoon(this.spec.world, id)) return;
+    const m = new THREE.Mesh(new THREE.CylinderGeometry(1.2, 1.2, 0.08, 24), M.toon(0xbfd0ff, { emissive: 0x6a8aff, ei: 0.6, transparent: true, opacity: 0.85 }));
+    m.position.set(x, top + 0.04, z); m.receiveShadow = true; this.add(m);
+    for (let i = 0; i < 4; i++) {
+      const c = new THREE.Mesh(new THREE.BoxGeometry(1.8, 0.1, 0.07), M.toon(0x2a3a6a));
+      c.position.set(x, top + 0.09, z); c.rotation.y = i * 0.8 + 0.3; this.add(c);
+    }
+    this.poundSpots.push({ x, y: top, z, id, mesh: m, done: false });
+  }
+
+  piece(x, y, z) {
+    const m = new THREE.Mesh(new THREE.OctahedronGeometry(0.32), M.toon(0xbfd8ff, { emissive: 0x6a9aff, ei: 0.9 }));
+    m.add(M.glowSprite(0x9ab8ff, 1.6, 0.7));
+    m.position.set(x, y, z); this.add(m);
+    this.pieces.push({ mesh: m, pos: m.position, base: y, taken: false });
+  }
+
+  ringRace(points, time, id) {
+    const rings = points.map(([x, y, z], i) => {
+      const m = new THREE.Mesh(new THREE.TorusGeometry(1.5, 0.14, 8, 32), M.toon(i ? 0xffd23f : 0x6fe8d8, { emissive: i ? 0xffa000 : 0x2fb5a8, ei: 0.7, unique: true }));
+      const nx = points[(i + 1) % points.length], ang = Math.atan2(nx[0] - x, nx[2] - z);
+      m.position.set(x, y, z); m.rotation.y = ang; m.visible = i === 0;
+      this.add(m);
+      return { mesh: m, pos: m.position };
+    });
+    this.rings = { rings, time, id, running: false, idx: 0, t: 0 };
+  }
+
+  lostItem(x, y, z) {
+    const g = new THREE.Group();
+    const b = M.toon(0xb08ad8);
+    const body = new THREE.Mesh(new THREE.SphereGeometry(0.35, 14, 10), b); g.add(body);
+    for (const sx of [-1, 1]) { const e = new THREE.Mesh(new THREE.SphereGeometry(0.13, 8, 6), b); e.position.set(sx * 0.25, 0.32, 0); g.add(e); }
+    const eye = M.toon(0x1a1020);
+    for (const sx of [-1, 1]) { const e = new THREE.Mesh(new THREE.SphereGeometry(0.05, 6, 4), eye); e.position.set(sx * 0.12, 0.08, 0.32); g.add(e); }
+    M.addOutline(g, 0.03);
+    g.add(M.glowSprite(0xffe066, 1.5, 0.5));
+    g.position.set(x, y, z); this.add(g);
+    this.lost = { mesh: g, pos: g.position, base: y, state: 'lying', home: { x, y, z } };
+  }
+
+  nest(p, id) {
+    const n = { x: p.x, y: p.y, z: p.z, id, enemies: [], done: this.game.hasMoon(this.spec.world, id) };
+    const types = ['nebling', 'nebling', 'flatterling', 'dornling'];
+    for (let i = 0; i < 4; i++) {
+      const a = i / 4 * Math.PI * 2;
+      const e = this.enemy(types[i], p.x + Math.cos(a) * p.r * 0.45, p.y, p.z + Math.sin(a) * p.r * 0.45, { range: p.r * 0.35 });
+      n.enemies.push(e);
+    }
+    const flag = new THREE.Mesh(new THREE.ConeGeometry(0.6, 2.2, 6), M.toon(0x4a2f73, { emissive: 0x2a1048, ei: 1 }));
+    flag.position.set(p.x, p.y + 1.1, p.z); this.add(flag);
+    this.nests.push(n);
+  }
+
+  npc(x, top, z, kind, color, yaw = 0) {
+    const m = M.createGlimmling(color);
+    m.position.set(x, top, z); m.rotation.y = yaw; this.add(m);
+    this.colliders.push(cylCollider(x, z, 0.45, top, top + 1.0));
+    const it = { kind, x, y: top, z, r: 2.4, mesh: m };
+    this.interactables.push(it);
+    this.anim.push({ kind: 'npc', obj: m, ph: x });
+    return it;
+  }
+
+  label(text, sub, x, y, z, color = '#fff1d6') {
+    const c = document.createElement('canvas'); c.width = 512; c.height = 160;
+    const ctx = c.getContext('2d');
+    ctx.fillStyle = 'rgba(40,20,50,0.75)'; ctx.strokeStyle = color; ctx.lineWidth = 8;
+    ctx.beginPath(); ctx.roundRect(8, 8, 496, 144, 36); ctx.fill(); ctx.stroke();
+    ctx.fillStyle = '#fff1d6'; ctx.textAlign = 'center'; ctx.font = '900 46px Nunito, Trebuchet MS, sans-serif';
+    ctx.fillText(text, 256, sub ? 70 : 96, 470);
+    if (sub) { ctx.font = '800 36px Nunito, Trebuchet MS, sans-serif'; ctx.fillStyle = '#ffe066'; ctx.fillText(sub, 256, 124, 470); }
+    const tex = new THREE.CanvasTexture(c); tex.colorSpace = THREE.SRGBColorSpace;
+    const sp = new THREE.Sprite(new THREE.SpriteMaterial({ map: tex, transparent: true, depthWrite: false }));
+    sp.scale.set(4.2, 1.3, 1); sp.position.set(x, y, z); this.add(sp);
+    return sp;
+  }
+
+  portal(x, top, z, yaw, target, name, sub, locked) {
+    const g = new THREE.Group(); g.position.set(x, top, z); g.rotation.y = yaw; this.add(g);
+    const col = target.type === 'boss' ? 0xb070ff : target.type === 'bonus' ? 0xffd23f : 0x6fe8d8;
+    const ring = new THREE.Mesh(new THREE.TorusGeometry(1.7, 0.22, 10, 40), M.toon(locked ? 0x6a6a7a : col, { emissive: locked ? 0x000000 : col, ei: 0.6, unique: true }));
+    ring.position.y = 2.0; g.add(ring);
+    const disc = new THREE.Mesh(new THREE.CircleGeometry(1.55, 32), M.basic(col, { transparent: true, opacity: locked ? 0.1 : 0.45, additive: true, side: THREE.DoubleSide }));
+    disc.position.y = 2.0; g.add(disc);
+    const base = new THREE.Mesh(new THREE.CylinderGeometry(1.9, 2.1, 0.3, 20), M.toon(0x5a4a6a)); base.position.y = 0.15; g.add(base);
+    M.addOutline(ring, 0.04);
+    const labelSprite = this.label(name, sub, x, top + 4.6, z, locked ? '#888' : '#' + col.toString(16).padStart(6, '0'));
+    const it = { kind: 'portal', x, y: top, z, r: 2.6, target, locked, name, disc, labelSprite, ring };
+    this.interactables.push(it);
+    this.portals.push(it);
+    return it;
+  }
+
+  unlockPortal(type, sub) {
+    const pt = this.portals.find((p) => p.target.type === type);
+    if (!pt || !pt.locked) return;
+    pt.locked = false;
+    const col = type === 'boss' ? 0xb070ff : 0xffd23f;
+    pt.ring.material.color.set(col); pt.ring.material.emissive.set(col);
+    this.label(pt.name, sub, pt.x, pt.y + 4.6, pt.z, type === 'boss' ? '#b070ff' : '#ffd23f');
+    if (pt.labelSprite) pt.labelSprite.visible = false;
+    this.game.particles.burst(new THREE.Vector3(pt.x, pt.y + 2, pt.z), { count: 24, color: [0xffffff, 0xb070ff], speed: 6, size: 0.8, tex: 'sparkle', additive: true });
+  }
+  unlockBossPortal() { this.unlockPortal('boss', this.game.t('ui.boss')); }
+  unlockBonusPortal() { this.unlockPortal('bonus', this.game.challengeSub(this.spec.world, 6)); }
+
+  ship(x, y, z, yaw) {
+    const a = M.createAirship(this.rand);
+    a.position.set(x, y, z); a.rotation.y = yaw; a.scale.setScalar(2.6); this.add(a);
+    const lamp = new THREE.Mesh(new THREE.SphereGeometry(0.5, 14, 10), M.toon(0xfff1d6, { emissive: 0xffa040, ei: 0.8 }));
+    lamp.position.set(0, 2.2, 0); a.add(lamp); lamp.add(M.glowSprite(0xffb050, 3, 0.8));
+    this.anim.push({ kind: 'ship', obj: a, base: y, ph: 0 });
+    const it = { kind: 'ship', x: x, y: 0, z: z, r: 6, mesh: a };
+    this.interactables.push(it);
+    return it;
+  }
+
+  nearestInteractable(p) {
+    let best = null, bd = 1e9;
+    for (const it of this.interactables) {
+      const d = Math.hypot(p.x - it.x, p.z - it.z);
+      if (d < it.r && Math.abs(p.y - it.y) < 3 && d < bd) { best = it; bd = d; }
+    }
+    return best;
   }
 
   keyAt(x, y, z) {
@@ -307,6 +526,7 @@ export class Level {
   spawnSparkMoonstone(p) {
     if (this.moonstones.some((m) => m.idx === 2)) return;
     const ms = this.moonstone(p.x, p.y + 2.6, p.z, 2);
+    this.game.audio.play('oneup');
     this.game.particles.burst(ms.pos, { count: 20, color: [0x9ab8ff, 0xffffff], speed: 5, size: 0.7, tex: 'sparkle', additive: true });
   }
 
@@ -314,11 +534,30 @@ export class Level {
 
   // ---------------- Sammelobjekte ----------------
   spark(x, y, z) {
-    const m = M.createSpark();
-    m.position.set(x, y, z);
-    this.add(m);
-    this.sparks.push({ mesh: m, pos: m.position, taken: false, base: y, ph: x * 0.3 + z * 0.2 });
+    this.sparks.push({ pos: new THREE.Vector3(x, y, z), taken: false, base: y, ph: x * 0.3 + z * 0.2 });
     this.sparkTotal++;
+  }
+
+  buildSparkInstances() {
+    if (!this.sparks.length) return;
+    const proto = M.createSpark();
+    const im = new THREE.InstancedMesh(proto.geometry, proto.material, this.sparks.length);
+    im.frustumCulled = false;
+    this.add(im);
+    this.sparkMesh = im;
+    this.updateSparkInstances(0);
+  }
+
+  updateSparkInstances(t) {
+    const im = this.sparkMesh; if (!im) return;
+    const m4 = new THREE.Matrix4(), q = new THREE.Quaternion(), sc = new THREE.Vector3(), up = new THREE.Vector3(0, 1, 0);
+    this.sparks.forEach((s, i) => {
+      q.setFromAxisAngle(up, t * 2.5 + s.ph);
+      sc.setScalar(s.taken ? 0 : 1);
+      m4.compose(s.pos, q, sc);
+      im.setMatrixAt(i, m4);
+    });
+    im.instanceMatrix.needsUpdate = true;
   }
   sparkLine(a, b, n) {
     for (let i = 0; i < n; i++) {
@@ -333,14 +572,15 @@ export class Level {
     const m = M.createHeart(); m.position.set(x, y, z); this.add(m);
     this.hearts.push({ mesh: m, pos: m.position, taken: false, base: y });
   }
-  crate(x, top, z, sparks = 5) {
+  crate(x, top, z, sparks = 5, moonId = null) {
     const m = M.createCrate(); m.position.set(x, top + 0.55, z); this.add(m);
     const c = boxCollider(x - 0.55, top, z - 0.55, x + 0.55, top + 1.1, z + 0.55, { crate: true });
     this.colliders.push(c);
-    const cr = { mesh: m, col: c, sparks, broken: false };
+    const cr = { mesh: m, col: c, sparks, broken: false, moonId };
     c.crateRef = cr;
     this.crates.push(cr);
     this.sparkTotal += sparks;
+    return cr;
   }
 
   checkpoint(x, top, z, yaw = 0) {
@@ -413,7 +653,7 @@ export class Level {
   }
 
   hint(x, top, z, r, text, sign = true) {
-    if (sign) { const s = M.createSign(); s.position.set(x, top, z); s.rotation.y = this.rand() * 0.6 - 0.3; this.add(s); }
+    if (sign) { const s = M.createSign(); s.position.set(x, top, z); s.rotation.y = this.rand() * 0.6 - 0.3; this.add(s); this.staticRoots.push(s); }
     this.hints.push({ x, y: top, z, r, text });
   }
 
@@ -427,18 +667,19 @@ export class Level {
       : kind === 'coral' ? M.createCoralPlant(this.rand) : kind === 'snowman' ? M.createSnowman(this.rand) : kind === 'crystal' ? M.createCrystal(this.rand, this.def.crystalColor) : M.createTree(this.rand, kind);
     if (kind === 'coral') t.scale.setScalar(2.2);
     t.position.set(x, top, z); t.rotation.y = this.rand() * 6;
-    this.add(t);
+    this.add(t); this.staticRoots.push(t);
     if (collide) this.colliders.push(cylCollider(x, z, 0.35, top, top + 2.5));
   }
   crystal(x, top, z, color, scale = 1) {
     const c = M.createCrystal(this.rand, color ?? this.def.crystalColor);
-    c.position.set(x, top, z); c.scale.setScalar(scale); this.add(c);
+    c.position.set(x, top, z); c.scale.setScalar(scale); this.add(c); this.staticRoots.push(c);
     if (scale > 1.4) this.colliders.push(cylCollider(x, z, 0.4 * scale, top, top + 1.5 * scale));
   }
-  rock(x, top, z) { const r = M.createRock(this.rand, this.def.rockColor); r.position.set(x, top + 0.1, z); this.add(r); }
+  rock(x, top, z) { const r = M.createRock(this.rand, this.def.rockColor); r.position.set(x, top + 0.1, z); this.add(r); this.staticRoots.push(r); }
 
   scatter(c, kind) {
-    const n = Math.round(((c.type === 'box' ? (c.maxX - c.minX) * (c.maxZ - c.minZ) : Math.PI * c.r * c.r)) * 0.18);
+    const dens = this.game.gfx ? { low: 0.06, medium: 0.12, high: 0.18, ultra: 0.26 }[this.game.gfx.name] : 0.18;
+    const n = Math.round(((c.type === 'box' ? (c.maxX - c.minX) * (c.maxZ - c.minZ) : Math.PI * c.r * c.r)) * dens);
     for (let i = 0; i < n; i++) {
       let x, z;
       if (c.type === 'box') { x = c.minX + 0.4 + this.rand() * (c.maxX - c.minX - 0.8); z = c.minZ + 0.4 + this.rand() * (c.maxZ - c.minZ - 0.8); }
@@ -452,16 +693,16 @@ export class Level {
       else continue;
       o.position.set(x, c.maxY, z);
       o.rotation.y = this.rand() * 6;
-      this.add(o);
+      this.add(o); this.staticRoots.push(o);
     }
   }
 
   distantIsland(x, y, z, r, o = {}) {
     const s = this.surf(o.mat || 'grass');
     const top = new THREE.Mesh(new THREE.CylinderGeometry(r, r * 0.95, r * 0.35, 14), [s.side, s.top, s.side]);
-    top.position.set(x, y, z); this.add(top);
+    top.position.set(x, y, z); this.add(top); this.staticRoots.push(top);
     const under = new THREE.Mesh(new THREE.ConeGeometry(r * 0.93, r * 1.8, 12), s.side);
-    under.rotation.x = Math.PI; under.position.set(x, y - r * 0.175 - r * 0.9, z); this.add(under);
+    under.rotation.x = Math.PI; under.position.set(x, y - r * 0.175 - r * 0.9, z); this.add(under); this.staticRoots.push(under);
     const n = o.trees ?? Math.round(r / 2);
     for (let i = 0; i < n; i++) {
       const a = this.rand() * 6.28, rr = this.rand() * r * 0.7;
@@ -475,9 +716,9 @@ export class Level {
       else t = M.createTree(this.rand, this.rand() < 0.3 ? 'blossom' : kind);
       t.position.set(x + Math.cos(a) * rr, y + r * 0.175, z + Math.sin(a) * rr);
       t.scale.setScalar(r / 5 + 0.5);
-      this.add(t);
+      t.traverse((o) => { o.castShadow = false; });
+      this.add(t); this.staticRoots.push(t);
     }
-    this.anim.push({ kind: 'bob', obj: top, base: y, amp: 0.4, sp: 0.3 + this.rand() * 0.3, ph: this.rand() * 6, other: under, obase: under.position.y });
   }
 
   clouds(n, cx, cz, spread, y0, y1, color, opacity) {
@@ -586,7 +827,7 @@ export class Level {
     for (const s of this.sparks) {
       if (s.taken) continue;
       if (s.pos.distanceToSquared(pc) < 1.1) {
-        s.taken = true; s.mesh.visible = false;
+        s.taken = true;
         g.addSparks(1, s.pos);
       }
     }
@@ -626,7 +867,23 @@ export class Level {
     }
     for (const ms of this.moonstones) {
       if (ms.taken) continue;
-      if (ms.pos.distanceToSquared(pc) < 1.6) { ms.taken = true; ms.mesh.visible = false; g.collectMoonstone(ms.idx, ms.pos); }
+      if (ms.pos.distanceToSquared(pc) < 1.6) { ms.taken = true; ms.mesh.visible = false; g.collectMoon(ms.id, ms.pos); }
+    }
+    for (const pc2 of this.pieces) {
+      if (pc2.taken || pc2.pos.distanceToSquared(pc) > 1.4) continue;
+      pc2.taken = true; pc2.mesh.visible = false;
+      const n = this.pieces.filter((q) => q.taken).length;
+      g.audio.play('heart');
+      g.hud.toast(g.t('ui.piece', { n, m: this.pieces.length }));
+      if (n === this.pieces.length && this.piecesMoon) this.spawnMoon(this.piecesMoon.pos, this.piecesMoon.id);
+    }
+    if (this.lost && this.lost.state === 'lying' && this.lost.pos.distanceToSquared(pc) < 1.6) {
+      this.lost.state = 'carried'; g.audio.play('heart'); g.hud.toast(g.t('ui.carry'), 2.5);
+    }
+    if (this.rings) this.updateRings(dt, pc);
+    for (const n of this.nests) {
+      if (n.done) continue;
+      if (n.enemies.every((e) => !e.alive)) { n.done = true; this.spawnMoon(new THREE.Vector3(n.x, n.y + 2, n.z), n.id); }
     }
     if (this.keyItem && !this.keyItem.taken && this.keyItem.pos.distanceToSquared(pc) < 1.6) {
       this.keyItem.taken = true; this.keyItem.mesh.visible = false; g.collectKey(this.keyItem.pos);
@@ -652,7 +909,44 @@ export class Level {
     this.game.addSparks(1, e.pos, true);
   }
 
+  updateRings(dt, pc) {
+    const R = this.rings, g = this.game;
+    if (!R.running) {
+      if (R.rings[0].pos.distanceTo(pc) < 1.7) {
+        R.running = true; R.idx = 1; R.t = R.time;
+        R.rings.forEach((r, i) => { r.mesh.visible = i > 0; });
+        g.audio.play('checkpoint');
+        g.hud.toast(g.t('ui.ringsStart', { n: R.rings.length - 1, s: R.time }), 2.5);
+      }
+      return;
+    }
+    R.t -= dt;
+    g.hud.setRace(Math.max(0, R.t));
+    const cur = R.rings[R.idx];
+    cur.mesh.scale.setScalar(1 + Math.sin(this.time * 10) * 0.08);
+    if (cur.pos.distanceTo(pc) < 1.7) {
+      cur.mesh.visible = false; g.audio.play('spark'); R.idx++;
+      if (R.idx >= R.rings.length) {
+        R.running = false; g.hud.setRace(null);
+        this.spawnMoon(cur.pos.clone(), R.id);
+        R.rings[0].mesh.visible = true;
+        return;
+      }
+    }
+    if (R.t <= 0) {
+      R.running = false; g.hud.setRace(null); g.audio.play('hurt');
+      g.hud.toast(g.t('ui.ringsFail'), 2.5);
+      R.rings.forEach((r, i) => { r.mesh.visible = i === 0; r.mesh.scale.setScalar(1); });
+    }
+  }
+
   shockwave(pos, radius) {
+    for (const ps of this.poundSpots) {
+      if (ps.done || Math.hypot(ps.x - pos.x, ps.z - pos.z) > 1.8 || Math.abs(ps.y - pos.y) > 0.6) continue;
+      ps.done = true; ps.mesh.visible = false;
+      this.game.shake(0.4);
+      this.spawnMoon(new THREE.Vector3(ps.x, ps.y + 2.2, ps.z), ps.id);
+    }
     for (const e of this.enemies) {
       if (!e.alive || !e.stompable) continue;
       if (Math.hypot(e.pos.x - pos.x, e.pos.z - pos.z) < radius && Math.abs(e.pos.y - pos.y) < 2) this.killEnemy(e, this.game.player);
@@ -665,7 +959,8 @@ export class Level {
     cr.broken = true; cr.col.disabled = true; cr.mesh.visible = false;
     this.game.audio.play('crumble');
     this.game.particles.burst(cr.mesh.position, { count: 12, color: [0xc08850, 0x7a4a2a], speed: 6, size: 0.6, gravity: -15 });
-    this.game.addSparks(cr.sparks, cr.mesh.position);
+    if (cr.sparks) this.game.addSparks(cr.sparks, cr.mesh.position);
+    if (cr.moonId) this.spawnMoon(cr.mesh.position.clone().add(new THREE.Vector3(0, 1.4, 0)), cr.moonId);
   }
 
   spinHit(player) {
@@ -678,7 +973,8 @@ export class Level {
   // visuelle Updates einmal pro Frame
   update(dt, player, camera) {
     const t = this.time;
-    for (const s of this.sparks) if (!s.taken) { s.mesh.rotation.y = t * 2.5 + s.ph; s.pos.y = s.base + Math.sin(t * 2 + s.ph) * 0.12; }
+    for (const s of this.sparks) if (!s.taken) s.pos.y = s.base + Math.sin(t * 2 + s.ph) * 0.12;
+    this.updateSparkInstances(t);
     for (const h of this.hearts) if (!h.taken) { h.mesh.rotation.y = t * 1.5; h.pos.y = h.base + Math.sin(t * 2) * 0.15; }
     for (const b of this.bouncers) {
       if (b.t > 0) b.t -= dt;
@@ -704,6 +1000,13 @@ export class Level {
         ? { count: 1, color: 0xffffff, speed: 0.3, size: 0.25, gravity: -1.2, life: 6, drag: 0 }
         : { count: 1, color: 0xbff8ff, speed: 0.3, size: 0.3, gravity: 1.5, life: 6, drag: 0, opacity: 0.6 });
     }
+    for (const pc2 of this.pieces) if (!pc2.taken) { pc2.mesh.rotation.y = t * 2; pc2.pos.y = pc2.base + Math.sin(t * 3 + pc2.base) * 0.15; }
+    if (this.lost) {
+      if (this.lost.state === 'carried') { this.lost.pos.set(player.pos.x, player.pos.y + 1.9, player.pos.z); this.lost.mesh.rotation.y = player.facing; }
+      else if (this.lost.state === 'lying') this.lost.pos.y = this.lost.base + Math.sin(t * 2) * 0.1;
+    }
+    for (const pt of this.portals) pt.disc.material.opacity = pt.locked ? 0.08 : 0.35 + Math.sin(t * 3) * 0.12;
+    for (const ps of this.poundSpots) if (!ps.done) ps.mesh.material.opacity = 0.6 + Math.sin(t * 4) * 0.25;
     for (const ms of this.moonstones) if (!ms.taken) { ms.mesh.rotation.y = t * 2; ms.pos.y = ms.base + Math.sin(t * 2.2) * 0.15; }
     if (this.keyItem && !this.keyItem.taken) { this.keyItem.mesh.rotation.y = t * 2.5; this.keyItem.pos.y = this.keyItem.base + Math.sin(t * 3) * 0.15; }
     for (const b of this.blinks) {
@@ -733,6 +1036,7 @@ export class Level {
       if (a.kind === 'bob') { const dy = Math.sin(t * a.sp + a.ph) * a.amp; a.obj.position.y = a.base + dy; a.other.position.y = a.obase + dy; }
       else if (a.kind === 'drift') { a.obj.position.x += a.sp * dt; if (a.obj.position.x > a.x1) a.obj.position.x = a.x0; }
       else if (a.kind === 'spin') a.obj.rotation.z += a.sp * dt;
+      else if (a.kind === 'npc') { const b = a.obj.userData.body; b.position.y = Math.abs(Math.sin(t * 3 + a.ph)) * 0.08; b.rotation.z = Math.sin(t * 1.5 + a.ph) * 0.08; }
       else if (a.kind === 'ship') { a.obj.position.y = a.base + Math.sin(t * 0.6 + a.ph) * 0.8; a.obj.userData.prop.rotation.x = t * 12; a.obj.rotation.z = Math.sin(t * 0.5 + a.ph) * 0.04; }
     }
     if (this.lighthouseObj) this.lighthouseObj.userData.lamp.material.color.set(this.game.lighthouseLit ? 0xfff3a0 : 0x3b3150);

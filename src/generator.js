@@ -3,6 +3,8 @@
 import { rng } from './textures.js';
 import { WORLDS, KEY_LEVEL } from './worlds.js';
 
+export function generateKingdom(L, spec) { generateLevel(L, spec); }
+
 export function generateLevel(L, spec) {
   const W = WORLDS[spec.world], S = W.style;
   const r = rng(spec.seed * 7919 + 13);
@@ -17,6 +19,7 @@ export function generateLevel(L, spec) {
   const placed = [];
   const arenas = [];
   let cur = null, heading = 0, pathLen = 0, segCount = 0;
+  let baseH = 0, spread = 1.25;
   const dir = (h) => [Math.sin(h), -Math.cos(h)];
   const sparkChance = kind === 'bonus' ? 1 : 0.6;
 
@@ -56,7 +59,7 @@ export function generateLevel(L, spec) {
     for (let tries = 0; tries < 12; tries++) {
       const jitter = o.fixed ? (tries ? (r() - 0.5) * 0.4 * tries : 0) : (r() - 0.5) * (tries < 6 ? 0.9 : 2.2);
       let h = base + jitter;
-      if (!o.free) h = Math.max(-1.25, Math.min(1.25, h));
+      if (!o.free) h = Math.max(baseH - spread, Math.min(baseH + spread, h));
       const [dx, dz] = dir(h);
       const dist = from.r + gap + rad;
       const x = from.x + dx * dist, z = from.z + dz * dist;
@@ -317,16 +320,16 @@ export function generateLevel(L, spec) {
   }
 
   // ---------------- Start ----------------
-  const startR = 6;
-  const startTop = W.id === 'lava' ? 0 : 0;
-  L.cyl(0, startTop, 0, startR, { mat: S.big, decor: S.decor });
-  L.spawn(0, startTop, 2.5, 0);
-  cur = { x: 0, y: startTop, z: 0, r: startR, h: 0 };
-  placed.push(cur);
-  const start = cur;
-  if (S.trees && S.trees.length) { L.tree(-3.8, 0, 2.6, pick(S.trees)); L.tree(3.6, 0, -2.4, pick(S.trees)); }
-  if (spec.index === 0 && kind === 'normal' && spec.world >= 3) L.hint(2.6, 0, 1, 3.4, 'world_' + W.id);
-  if (kind === 'bonus') L.hint(2.6, 0, 1, 3.4, 'bonus');
+  let startR = 6, start = null;
+  if (kind !== 'kingdom') {
+    L.cyl(0, 0, 0, startR, { mat: S.big, decor: S.decor });
+    L.spawn(0, 0, 2.5, 0);
+    cur = { x: 0, y: 0, z: 0, r: startR, h: 0 };
+    placed.push(cur);
+    start = cur;
+    if (S.trees && S.trees.length) { L.tree(-3.8, 0, 2.6, pick(S.trees)); L.tree(3.6, 0, -2.4, pick(S.trees)); }
+    if (kind === 'bonus') L.hint(2.6, 0, 1, 3.4, 'bonus');
+  }
 
   // ---------------- Hauptweg ----------------
   const weights = Object.entries(W.seg);
@@ -339,7 +342,75 @@ export function generateLevel(L, spec) {
     return 'hops';
   };
 
-  if (kind === 'boss') {
+  // ---------------- Geheimnisse ----------------
+  let usedAnchors = new Set();
+  const anchor = () => {
+    const opts = arenas.filter((a) => !usedAnchors.has(a));
+    return opts.length ? pick(opts) : pick(arenas);
+  };
+  // Mutpfad: harte Seitensprünge zu Mondstein 0
+  const branch = (reward, ghostly = false) => {
+    for (let tries = 0; tries < 8; tries++) {
+      const a = anchor();
+      const side = (r() < 0.5 ? 1 : -1) * Math.PI / 2;
+      const h0 = a.h + side;
+      let c = a;
+      const n = ghostly ? 3 : 2 + Math.floor(r() * 2);
+      const plan = [];
+      let ok = true;
+      for (let i = 0; i < n; i++) {
+        const gap = ghostly ? R(1.6, 2.6) : R(2.6, lerp(3.4, 3.9, d));
+        const dy = ghostly ? R(0.5, 1.5) : R(0, 1.5);
+        const rad = ghostly ? 1.4 : R(1.1, 1.5);
+        const q = place(gap, dy, rad, '', { from: c, heading: h0, fixed: true, free: true, keepHeading: true, margin: 2.5, dry: true });
+        if (!q) { ok = false; break; }
+        plan.push({ q, from: c });
+        placed.push(q); c = q;
+      }
+      if (!ok) { for (const pl of plan) placed.splice(placed.indexOf(pl.q), 1); continue; }
+      for (const { q, from } of plan) {
+        const pm = makePlat(ghostly ? 'ghost' : 'pillar', q.x, q.y, q.z, q.r);
+        q.col = pm.col;
+        L.link(edge(from, q.h), [q.x, q.y, q.z], { jump: 1 });
+        L.spark(q.x, q.y + 1.2, q.z);
+      }
+      usedAnchors.add(a);
+      reward(c);
+      return true;
+    }
+    return false;
+  };
+  const below = (reward) => {
+    const p = { x: 0, y: Math.max(start.y - 7, minY + 0.5), z: startR + 4.2, r: 2.6 };
+    L.cyl(p.x, p.y, p.z, p.r, { mat: S.small, h: 2 });
+    L.link([0, start.y, startR - 0.6], [p.x + 1.1, p.y, p.z - 0.6], { back: true });
+    L.bouncer(p.x - 1.2, p.y, p.z + 0.6, 30);
+    L.link([p.x - 1.2, p.y + 0.9, p.z + 0.6], [0, start.y, startR - 2.5], { via: [p.x - 1.2, p.z + 0.6], viaY: start.y + 3 });
+    reward({ x: p.x + 1.1, y: p.y, z: p.z - 0.6 });
+  };
+  const high = (reward) => {
+    for (let tries = 0; tries < 8; tries++) {
+      const a = anchor();
+      const ang = r() * 6.28;
+      const bx = a.x + Math.cos(ang) * (a.r - 1.5), bz = a.z + Math.sin(ang) * (a.r - 1.5);
+      const sx = a.x + Math.cos(ang) * (a.r + 4), sz = a.z + Math.sin(ang) * (a.r + 4);
+      if (!free(sx, sz, 2.2, a, 1.5)) continue;
+      const blocked = L.colliders.some((c) => c.maxY > a.y + 0.2 && c.minY < a.y + 12 && (c.type === 'cyl' ? Math.hypot(c.x - bx, c.z - bz) < c.r + 1.6 : bx > c.minX - 1.6 && bx < c.maxX + 1.6 && bz > c.minZ - 1.6 && bz < c.maxZ + 1.6));
+      if (blocked) continue;
+      usedAnchors.add(a);
+      L.bouncer(bx, a.y, bz, 28);
+      makePlat('cloud', sx, a.y + 7.5, sz, 2.2);
+      placed.push({ x: sx, y: a.y + 7.5, z: sz, r: 2.2 });
+      L.link([bx, a.y + 0.9, bz], [sx, a.y + 7.5, sz], { via: [bx, bz], viaY: a.y + 8.8 });
+      reward({ x: sx, y: a.y + 7.5, z: sz });
+      return true;
+    }
+    return false;
+  };
+
+  if (kind === 'kingdom') {
+    buildKingdom();
+  } else if (kind === 'boss') {
     for (let i = 0; i < 3; i++) { const n = chooseSeg(); if (!SEG[n]()) SEG.hops(); }
     // Arena
     const [dx, dz] = dir(heading);
@@ -382,71 +453,6 @@ export function generateLevel(L, spec) {
       arenas.push(g);
       L.links[L.links.length - 1].b = [g.x - dir(g.h)[0] * 3, g.y, g.z - dir(g.h)[1] * 3];
     }
-    // ---------------- Geheimnisse ----------------
-    const usedAnchors = new Set();
-    const anchor = () => {
-      const opts = arenas.filter((a) => !usedAnchors.has(a));
-      return opts.length ? pick(opts) : pick(arenas);
-    };
-    // Mutpfad: harte Seitensprünge zu Mondstein 0
-    const branch = (reward, ghostly = false) => {
-      for (let tries = 0; tries < 8; tries++) {
-        const a = anchor();
-        const side = (r() < 0.5 ? 1 : -1) * Math.PI / 2;
-        const h0 = a.h + side;
-        let c = a;
-        const n = ghostly ? 3 : 2 + Math.floor(r() * 2);
-        const plan = [];
-        let ok = true;
-        for (let i = 0; i < n; i++) {
-          const gap = ghostly ? R(1.6, 2.6) : R(2.6, lerp(3.4, 3.9, d));
-          const dy = ghostly ? R(0.5, 1.5) : R(0, 1.5);
-          const rad = ghostly ? 1.4 : R(1.1, 1.5);
-          const q = place(gap, dy, rad, '', { from: c, heading: h0, fixed: true, free: true, keepHeading: true, margin: 2.5, dry: true });
-          if (!q) { ok = false; break; }
-          plan.push({ q, from: c });
-          placed.push(q); c = q;
-        }
-        if (!ok) { for (const pl of plan) placed.splice(placed.indexOf(pl.q), 1); continue; }
-        for (const { q, from } of plan) {
-          const pm = makePlat(ghostly ? 'ghost' : 'pillar', q.x, q.y, q.z, q.r);
-          q.col = pm.col;
-          L.link(edge(from, q.h), [q.x, q.y, q.z], { jump: 1 });
-          L.spark(q.x, q.y + 1.2, q.z);
-        }
-        usedAnchors.add(a);
-        reward(c);
-        return true;
-      }
-      return false;
-    };
-    const below = (reward) => {
-      const p = { x: 0, y: Math.max(start.y - 7, minY + 0.5), z: startR + 4.2, r: 2.6 };
-      L.cyl(p.x, p.y, p.z, p.r, { mat: S.small, h: 2 });
-      L.link([0, start.y, startR - 0.6], [p.x + 1.1, p.y, p.z - 0.6], { back: true });
-      L.bouncer(p.x - 1.2, p.y, p.z + 0.6, 30);
-      L.link([p.x - 1.2, p.y + 0.9, p.z + 0.6], [0, start.y, startR - 2.5], { via: [p.x - 1.2, p.z + 0.6], viaY: start.y + 3 });
-      reward({ x: p.x + 1.1, y: p.y, z: p.z - 0.6 });
-    };
-    const high = (reward) => {
-      for (let tries = 0; tries < 8; tries++) {
-        const a = anchor();
-        const ang = r() * 6.28;
-        const bx = a.x + Math.cos(ang) * (a.r - 1.5), bz = a.z + Math.sin(ang) * (a.r - 1.5);
-        const sx = a.x + Math.cos(ang) * (a.r + 4), sz = a.z + Math.sin(ang) * (a.r + 4);
-        if (!free(sx, sz, 2.2, a, 1.5)) continue;
-        const blocked = L.colliders.some((c) => c.maxY > a.y + 0.2 && c.minY < a.y + 12 && (c.type === 'cyl' ? Math.hypot(c.x - bx, c.z - bz) < c.r + 1.6 : bx > c.minX - 1.6 && bx < c.maxX + 1.6 && bz > c.minZ - 1.6 && bz < c.maxZ + 1.6));
-        if (blocked) continue;
-        usedAnchors.add(a);
-        L.bouncer(bx, a.y, bz, 28);
-        makePlat('cloud', sx, a.y + 7.5, sz, 2.2);
-        placed.push({ x: sx, y: a.y + 7.5, z: sz, r: 2.2 });
-        L.link([bx, a.y + 0.9, bz], [sx, a.y + 7.5, sz], { via: [bx, bz], viaY: a.y + 8.8 });
-        reward({ x: sx, y: a.y + 7.5, z: sz });
-        return true;
-      }
-      return false;
-    };
     const ms = (idx) => (p) => { L.moonstone(p.x, p.y + 1.4, p.z, idx); L.sparkRing(p.x, p.y + 1.2, p.z, 1.2, 4); };
     const key = (p) => { L.keyAt(p.x, p.y + 1.4, p.z); };
     if (!branch(ms(0))) high(ms(0));
@@ -461,14 +467,117 @@ export function generateLevel(L, spec) {
     if (spec.index === KEY_LEVEL && kind === 'normal') hidden(hiddenTypes[(spec.world + spec.index + 1) % 3], key);
   }
 
-  // ---------------- Kulisse ----------------
-  const islands = 4 + Math.floor(r() * 3);
-  for (let i = 0; i < islands; i++) {
-    const side = i % 2 ? 1 : -1;
-    L.distantIsland(side * R(35, 60), R(-10, 25), -i * 25 + R(-10, 10), R(6, 12), { mat: S.big, kind: S.islandKind, trees: 3 + Math.floor(r() * 3) });
+
+  // ================= Offene Welt: ein ganzes Reich =================
+  function buildKingdom() {
+    const g = L.game, w = spec.world;
+    const HUB = 16;
+    startR = HUB;
+    L.cyl(0, 0, 0, HUB, { mat: S.big, decor: S.decor, h: 4 });
+    L.spawn(0, 0, 9, 0);
+    start = cur = { x: 0, y: 0, z: 0, r: HUB, h: 0 };
+    placed.push(cur);
+    // Luftschiff "Leuchtfeder" an der Südseite (+Z)
+    placed.push({ x: 0, y: 0, z: HUB + 9, r: 9, obstacle: true });
+    const ship = L.ship(0, 4, HUB + 9, Math.PI / 2);
+    ship.x = 0; ship.z = HUB - 1.5; ship.r = 4;
+    L.checkpoint(-3.5, 0, HUB - 5);
+    // NPCs, Tore, Ringlauf
+    L.npc(-10, 0, -3, 'shop', 0xffd23f, 1.2);
+    L.npc(10, 0, -3, 'lost', 0xffb3d1, -1.2);
+    const bossOpen = g.bossOpen(w);
+    L.portal(0, 0, -11, 0, { type: 'boss' }, g.t(`worlds.${w}.boss`), bossOpen ? g.t('ui.boss') : g.t('ui.needMoonsBoss', { n: g.bossReq(w) }), !bossOpen);
+    const keyOk = g.hasKey(w);
+    L.portal(-11.5, 0, 5.5, -2.0, { type: 'bonus' }, g.t('ui.bonusLevel'), keyOk ? g.challengeSub(w, 6) : '🔒', !keyOk);
+    if (w === 0) {
+      L.hint(4, 0, 10, 3, 'move');
+      L.hint(-6, 0, 9.5, 2.6, 'moonstones');
+      L.hint(3, 0, 13.5, 2.2, 'ship', false);
+    } else if (w >= 3) L.hint(4, 0, 10, 3, 'world_' + W.id);
+    if (S.trees && S.trees.length) for (const [a, rr] of [[0.9, 13], [2.3, 13.5], [4.0, 13], [5.3, 13.5]]) L.tree(Math.cos(a) * rr, 0, Math.sin(a) * rr, pick(S.trees));
+    if (!g.hasMoon(w, 'rings')) {
+      const pts = [];
+      for (let i = 0; i < 9; i++) { const a = -Math.PI / 2 + 0.5 + i / 9 * Math.PI * 2 * 0.92; pts.push([Math.cos(a) * 13.8, 1.3 + (i % 3) * 0.6, Math.sin(a) * 13.8]); }
+      L.ringRace(pts, 14, 'rings');
+    }
+
+    // ---- fünf Inselketten ----
+    const H = [-2.35, -1.2, 0, 1.2, 2.35];
+    spread = 0.5;
+    const spokeArenas = [];
+    for (let k = 0; k < 5; k++) {
+      baseH = heading = H[k]; cur = start;
+      const n1 = 2 + Math.floor(r() * 2);
+      for (let i = 0; i < n1; i++) { const nm = chooseSeg(); if (!SEG[nm]()) SEG.hops(); }
+      let a = arena(true);
+      if (!a) { SEG.hops(); a = arena(true); }
+      if (a) {
+        spokeArenas.push(a);
+        const pa = a.h + Math.PI / 2 * (k % 2 ? 1 : -1);
+        const px = a.x + Math.cos(pa) * 0 + Math.sin(pa) * (a.r - 2.6), pz = a.z - Math.cos(pa) * (a.r - 2.6);
+        L.portal(px, a.y, pz, Math.atan2(a.x - px, a.z - pz), { type: 'challenge', i: k }, g.t(`worlds.${w}.levels.${k}`), g.challengeSub(w, k), false);
+      }
+      const n2 = 2 + Math.floor(r() * 2);
+      for (let i = 0; i < n2; i++) { const nm = chooseSeg(); if (!SEG[nm]()) SEG.hops(); }
+      // Gipfel
+      SEG.stairs();
+      const peak = place(R(1.6, 2.4), R(1.2, 1.8), 2.4, 'island');
+      const top = peak || cur;
+      L.moon(top.x, top.y + 1.5, top.z, 'peak' + k);
+      L.sparkRing(top.x, top.y + 1.2, top.z, 1.4, 5);
+      L.label(g.t('ui.peak'), '', top.x, top.y + 4.2, top.z);
+      if (peak) arenas.push(peak);
+    }
+    for (const a of spokeArenas) arenas.push(a);
+
+    // ---- Mondsplitter-Verstecke ----
+    const moonAt = (id) => (p) => { L.moon(p.x, p.y + 1.4, p.z, id); L.sparkRing(p.x, p.y + 1.2, p.z, 1.2, 4); };
+    let fallbackN = 0;
+    const fallback = (id) => { const a = 0.4 + fallbackN++ * 0.9; L.poundSpot(Math.cos(a) * 7, 0, Math.sin(a) * 7 - 2, id); };
+    const ensure = (id, fn) => { if (!fn()) fallback(id); };
+    usedAnchors = new Set();
+    for (let i = 0; i < 3; i++) ensure('branch' + i, () => branch(moonAt('branch' + i)) || high(moonAt('branch' + i)));
+    ensure('hid0', () => branch(moonAt('hid0'), true) || high(moonAt('hid0')));
+    below(moonAt('hid1'));
+    ensure('hid2', () => high(moonAt('hid2')) || branch(moonAt('hid2'), true));
+    // Schlüssel zum Bonus-Tor
+    if (!keyOk) { if (!branch((p) => L.keyAt(p.x, p.y + 1.4, p.z), true)) high((p) => L.keyAt(p.x, p.y + 1.4, p.z)); }
+    // verlorenes Kuscheltier
+    if (!g.hasMoon(w, 'lost')) {
+      if (!high((p) => L.lostItem(p.x, p.y + 0.6, p.z))) { const a = pick(spokeArenas); L.lostItem(a.x, a.y + 0.6, a.z); }
+    }
+    // Stampfstellen und Kisten auf Arenen
+    const spots = spokeArenas.slice();
+    const spotOn = (a, k) => { const ang = r() * 6.28; return [a.x + Math.cos(ang) * a.r * 0.55 * k, a.z + Math.sin(ang) * a.r * 0.55 * k]; };
+    for (let i = 0; i < 2; i++) { const a = spots[(i * 2 + 1) % spots.length]; const [x, z] = spotOn(a, 0.7); L.poundSpot(x, a.y, z, 'pound' + i); }
+    for (let i = 0; i < 2; i++) { const a = spots[(i * 2 + 2) % spots.length]; const [x, z] = spotOn(a, 1); L.crate(x, a.y, z, 2, 'crate' + i); }
+    // Nebelnest
+    const nestA = spots[0] || start;
+    L.nest(nestA, 'nest');
+    // fünf Mondfunken auf Plattformen verteilt
+    if (!g.hasMoon(w, 'pieces')) {
+      const cands = placed.filter((q) => !q.obstacle && q !== start && q.r < 4 && q.r > 1);
+      for (let i = 0; i < 5; i++) { const q = cands[Math.floor(r() * cands.length)]; if (q) L.piece(q.x, q.y + 1.3, q.z); }
+      L.piecesMoon = { pos: { x: 0, y: 2.5, z: 0 }, id: 'pieces' };
+    }
   }
-  L.clouds(10, 0, -60, 240, -25, -10, W.theme.cloud, W.id === 'coral' ? 0.5 : 0.9);
-  if (S.ships) for (let i = 0; i < 4; i++) L.airship(R(-40, 40), R(15, 45), -i * 35 - 20, r() * 6);
-  if (S.gears) for (let i = 0; i < 6; i++) L.gear(R(-50, 50) + (i % 2 ? 30 : -30), R(-10, 30), -i * 25, R(4, 9), (r() - 0.5) * 0.6, r() * 3);
+
+  // ---------------- Kulisse ----------------
+  if (kind === 'kingdom') {
+    for (let i = 0; i < 10; i++) {
+      const a = i / 10 * Math.PI * 2 + r() * 0.4, rr = R(150, 210);
+      L.distantIsland(Math.cos(a) * rr, R(-15, 35), Math.sin(a) * rr, R(9, 16), { mat: S.big, kind: S.islandKind, trees: 4 + Math.floor(r() * 4) });
+    }
+    L.clouds(22, 0, 0, 420, -28, -10, W.theme.cloud, W.id === 'coral' ? 0.5 : 0.9);
+  } else {
+    const islands = 4 + Math.floor(r() * 3);
+    for (let i = 0; i < islands; i++) {
+      const side = i % 2 ? 1 : -1;
+      L.distantIsland(side * R(35, 60), R(-10, 25), -i * 25 + R(-10, 10), R(6, 12), { mat: S.big, kind: S.islandKind, trees: 3 + Math.floor(r() * 3) });
+    }
+    L.clouds(10, 0, -60, 240, -25, -10, W.theme.cloud, W.id === 'coral' ? 0.5 : 0.9);
+  }
+  if (S.ships) for (let i = 0; i < (kind === 'kingdom' ? 8 : 4); i++) L.airship(R(-40, 40) * (kind === 'kingdom' ? 3 : 1), R(15, 45), kind === 'kingdom' ? R(-120, 120) : -i * 35 - 20, r() * 6);
+  if (S.gears) for (let i = 0; i < (kind === 'kingdom' ? 12 : 6); i++) L.gear(R(-50, 50) + (i % 2 ? 30 : -30) * (kind === 'kingdom' ? 3 : 1), R(-10, 30), kind === 'kingdom' ? R(-140, 140) : -i * 25, R(4, 9), (r() - 0.5) * 0.6, r() * 3);
   L.par = Math.round(12 + pathLen / 6.2 + segCount * 2.5);
 }

@@ -7,7 +7,7 @@ export class HUD {
     this.el = {
       hud: $('#hud'), hearts: $('#hearts'), lives: $('#lives'), sparks: $('#sparks'), shards: $('#shards'),
       hint: $('#hint'), toast: $('#toast'), banner: $('#banner'), boss: $('#bossbar'), screen: $('#screen'),
-      dialog: $('#dialog'), fade: $('#fade'), timer: $('#timer'), moons: $('#moons'),
+      dialog: $('#dialog'), fade: $('#fade'), timer: $('#timer'), moons: $('#moons'), prompt: $('#prompt'), race: $('#race'),
     };
     this.menu = null;
     this.dlg = null;
@@ -26,9 +26,12 @@ export class HUD {
       this.el.hearts.classList.remove('pulse'); void this.el.hearts.offsetWidth; this.el.hearts.classList.add('pulse');
     }
   }
-  setLives(n) { this.el.lives.innerHTML = `<span class="lumi-icon"></span>× ${n}`; }
+  setLives(n) {
+    this.el.lives.style.display = n == null ? 'none' : '';
+    if (n != null) this.el.lives.innerHTML = `<span class="lumi-icon"></span>× ${n}`;
+  }
   setSparks(n, got, total) {
-    this.el.sparks.innerHTML = `<span class="spark-icon"></span>${n}<small>${got}/${total}</small>`;
+    this.el.sparks.innerHTML = `<span class="spark-icon"></span>${n}${total == null ? '' : `<small>${got}/${total}</small>`}`;
     this.el.sparks.classList.remove('pop'); void this.el.sparks.offsetWidth; this.el.sparks.classList.add('pop');
   }
   setShards(n) {
@@ -42,10 +45,27 @@ export class HUD {
     this.el.moons.innerHTML = arr.map((v) => `<span class="moon ${v ? 'full' : ''}"></span>`).join('');
   }
   setTimer(t) {
+    this.el.timer.style.display = t == null ? 'none' : '';
+    if (t == null) return;
     const m = Math.floor(t / 60), s = Math.floor(t % 60);
     this.el.timer.textContent = `${m}:${String(s).padStart(2, '0')}`;
   }
 
+  setMoonCount(n, total) {
+    this.el.moons.style.display = '';
+    this.el.moons.innerHTML = `<span class="moon full"></span> ${n}<small>/${total}</small>`;
+  }
+  prompt(text) {
+    if (text === this.curPrompt) return;
+    this.curPrompt = text;
+    this.el.prompt.classList.toggle('show', !!text);
+    document.querySelector('[data-btn="act"]').classList.toggle('show', !!text);
+    if (text) this.el.prompt.innerHTML = `<span class="key">${this.keyLabel || 'Enter'}</span> ${text}`;
+  }
+  setRace(t) {
+    this.el.race.classList.toggle('show', t != null);
+    if (t != null) this.el.race.textContent = t.toFixed(1);
+  }
   hint(text) {
     if (text === this.curHint) return;
     this.curHint = text;

@@ -17,6 +17,7 @@ const ART = [
   ['steam/library_hero_3840x1240.png', 3840, 1240, 'w=0&l=0&a=0.7&d=11&h=2.5&logo=none&ly=2.2&fx=6'],
   ['steam/page_background_1438x810.png', 1438, 810, 'w=7&l=0&a=0.4&d=14&h=4&logo=none&ly=3'],
   ['itch/cover_630x500.png', 630, 500, 'w=0&l=0&a=0.5&d=8&h=2.4&logo=top&ly=2.6'],
+  ['screenshots/00_open_world.png', 1920, 1080, 'w=0&a=1.9&d=24&h=13&ly=1&face=1.9'],
   ['screenshots/01_meadows.png', 1920, 1080, 'w=0&l=0&a=0.2&d=8&h=3.2&ly=2.2&face=3.34'],
   ['screenshots/02_crystal.png', 1920, 1080, 'w=1&l=0&a=0.15&d=8&h=3.5&ly=2.2&face=3.29'],
   ['screenshots/03_shipyard.png', 1920, 1080, 'w=2&l=0&a=0.25&d=8&h=4&ly=3.5&face=3.39'],
@@ -39,7 +40,7 @@ const ART = [
     await page.goto(`${game}?promo=1&lang=${lang}&${q}`);
     await page.waitForTimeout(w > 2000 ? 9000 : 4500);
     fs.mkdirSync(path.dirname(path.join(out, file)), { recursive: true });
-    await page.screenshot({ path: path.join(out, file) });
+    await page.screenshot({ path: path.join(out, file), timeout: 300000 });
     await page.close();
     console.log('✓', file);
   }

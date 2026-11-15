@@ -107,7 +107,7 @@ export class Input {
     const b = (i) => !!(p.buttons[i] && p.buttons[i].pressed);
     const state = {
       lx: dz(p.axes[0] || 0), ly: dz(p.axes[1] || 0), rx: dz(p.axes[2] || 0), ry: dz(p.axes[3] || 0),
-      jump: b(0), spin: b(2) || b(1), pound: b(6) || b(7) || b(4) || b(5), pause: b(9), confirm: b(0), back: b(1),
+      jump: b(0), spin: b(2) || b(1), act: b(3), pound: b(6) || b(7) || b(4) || b(5), pause: b(9), confirm: b(0), back: b(1),
       up: b(12), down: b(13),
     };
     this.pad = state;
@@ -154,6 +154,7 @@ export class Input {
   jumpPressed() { return this.pressed.has('Space') || this.pressed.has('KeyK') || (this.padPressed && this.padPressed.jump) || this.touchPressed.has('jump'); }
   spinPressed() { return this.pressed.has('KeyF') || this.pressed.has('KeyJ') || this.pressed.has('Mouse0') || (this.padPressed && this.padPressed.spin) || this.touchPressed.has('spin'); }
   poundPressed() { return this.pressed.has('ShiftLeft') || this.pressed.has('ShiftRight') || this.pressed.has('KeyC') || this.pressed.has('Mouse2') || (this.padPressed && this.padPressed.pound) || this.touchPressed.has('pound'); }
+  interactPressed() { return this.pressed.has('Enter') || this.pressed.has('KeyT') || (this.padPressed && this.padPressed.act) || this.touchPressed.has('act'); }
   pausePressed() { return this.pressed.has('Escape') || this.pressed.has('KeyP') || (this.padPressed && this.padPressed.pause) || this.touchPressed.has('pause'); }
   confirmPressed() { return this.pressed.has('Enter') || this.pressed.has('Space') || (this.padPressed && this.padPressed.confirm); }
 

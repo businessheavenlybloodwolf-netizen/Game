@@ -16,7 +16,8 @@ sowie Desktop-Versionen für Windows, Linux/Steam Deck und macOS. Fertige Store-
 
 Hoch über dem Wolkenmeer schweben die Inseln von **Lumeria**. Graf Nebelmaul hat das *Morgenlicht*, den Kristall auf dem
 alten Leuchtturm, in sieben Splitter zerschlagen und jedem seiner Nebelfürsten einen gegeben. Den Kern behält er selbst.
-Aus dem letzten Funken erwacht **Lumi**, ein kleiner Laternengeist. Die Stimme der Leuchtturmwärterin **Elva** führt Lumi durch acht Welten.
+Aus dem letzten Funken erwacht **Lumi**, ein kleiner Laternengeist. Die Stimme der Leuchtturmwärterin **Elva** führt Lumi durch acht Reiche. Mit ihrem alten Luftschiff **Leuchtfeder**,
+dessen Laterne nur mit **Mondsplittern** leuchtet, reist Lumi von Reich zu Reich.
 
 **Sprachen:** Deutsch, English, Français, Español, Italiano, Türkçe. Story, Menüs und Hinweise sind komplett übersetzt.
 Die Sprache wird automatisch erkannt und ist im Hauptmenü und im Pausenmenü umschaltbar.
@@ -34,20 +35,58 @@ Die Sprache wird automatisch erkannt und ist im Hauptmenü und im Pausenmenü um
 | 7 | Korallentiefe | geringe Schwerkraft, Blasenströme, Quallen | Tiefenschlund |
 | 8 | Nebelreich | Uhrwerk, alles gemischt, Finale | Graf Nebelmaul |
 
-- **Pro Welt 7 Level:** 5 normale Level, ein Bosslevel und ein geheimes Bonuslevel. Insgesamt sind das **56 Level**.
-- **Sternenpfade (nach dem Finale):** 56 weitere, schwerere Nachtversionen mit eigenen Geheimnissen und stärkeren Bossen. Insgesamt sind das **112 Level**.
-- **Geheimnisse pro Level:** 3 Mondsteine (Mutpfad, Versteck und alle Funken). Verstecke sind unsichtbare Geisterplatten, Höhlen unter der Startinsel oder hohe Wolkenschätze.
-  Dazu kommt ein **Geheimschlüssel** pro Welt (öffnet das Bonuslevel) und eine **Zeitmedaille** pro Level.
-- **288 Mondsteine** insgesamt (144 je Modus). Neue Welten brauchen eine Mindestzahl an Mondsteinen.
-- **Spielzeit:** Für alle Geheimnisse in beiden Modi rechne ich mit über 20 Stunden. Das ist eine Schätzung, kein Messwert, und hängt stark vom Spieler ab.
+### Offene Welt
 
-Die ersten Level der Welten 1–3 sind handgebaut. Alle anderen baut ein **Level-Generator** (`src/generator.js`) aus Bausteinen
-wie Sprungreihen, Treppen, Fahrstühlen, Aufwinden, Blinkplatten, Geysirfeldern und Brücken, mit festem Seed. Jedes Level ist also immer gleich, aber jedes ist anders.
+Jede Welt ist ein frei begehbares **Reich**:
+- In der Mitte liegt eine **Hub-Insel** mit dem Luftschiff **Leuchtfeder**, der Händlerin, einem Glimmling, der sein Kuscheltier vermisst,
+  dem **Nebeltor** zum Boss und einem goldenen **Bonustor**.
+- Vom Hub führen **5 Inselketten** in alle Richtungen. Jede hat eine Arena mit **Lichttor** zu einer Herausforderung und endet an einem **Gipfel**.
+
+**Mondsplitter pro Reich: 47.** Insgesamt sind es **376**.
+
+| Quelle | Anzahl |
+|---|---|
+| Gipfel | 5 |
+| Mutpfade (Seitenwege mit schweren Sprüngen) | 3 |
+| Verstecke (Geisterplatten, Höhle unter dem Hub, Wolkenschatz) | 3 |
+| Stampfstellen | 2 |
+| Kisten | 2 |
+| 5 Mondfunken einsammeln | 1 |
+| Kuscheltier zurückbringen | 1 |
+| Ringlauf um den Hub | 1 |
+| Händlerin (100 Funken) | 1 |
+| Nebelnest räumen | 1 |
+| 5 Herausforderungen hinter Lichttoren (Ziel, 2 Geheimnisse, alle Funken) | 20 |
+| Bonustor (braucht den Geheimschlüssel) | 4 |
+| Boss (großer Splitter) | 3 |
+
+**Fortschritt:**
+- Das Nebeltor öffnet sich ab 5 bis 12 Mondsplittern.
+- Ins nächste Reich fliegt die Leuchtfeder, wenn der Boss besiegt ist und genug Mondsplitter gesammelt sind (10 bis 22).
+- Die **Mondliste** im Pausenmenü zeigt, was schon gefunden ist.
+- Es gibt kein Game Over: Wer abstürzt oder alle Herzen verliert, verliert 10 Funken und startet am letzten Checkpoint neu.
+
+Die ersten Herausforderungen der Welten 1–3 sind handgebaut. Alle Reiche und übrigen Herausforderungen baut ein **Level-Generator** (`src/generator.js`)
+aus Bausteinen wie Sprungreihen, Treppen, Fahrstühlen, Aufwinden, Blinkplatten, Geysirfeldern und Brücken, mit festem Seed.
+
+### Grafik
+
+Die Grafikstufe lässt sich im Haupt- und Pausenmenü umschalten.
+
+| Stufe | Auflösung | Extras |
+|---|---|---|
+| Niedrig | 1× | weniger Deko, 1024er-Schatten |
+| Mittel (Standard auf Handys) | bis 1,5× | wie bisher |
+| Hoch (Standard auf dem PC) | bis 2× | Bloom-Leuchten |
+| Ultra | **bis 3840×2160 (4K)**, auf kleineren Bildschirmen als Supersampling | 4096er-Schatten, doppelt so scharfe Texturen, mehr Deko, weitere Sicht |
+
+Unbewegliche Teile werden beim Laden zu großen Meshes verschmolzen (Static Batching in 60-m-Kacheln), dazu Instancing für die Funken.
+Das senkt die Draw Calls in einem Reich auf rund ein Viertel.
 
 ## Qualitätssicherung
 
 Der Generator notiert jeden Sprung des Levels, auch die Wege zu allen Geheimnissen. Ein Test-Bot springt jeden einzelnen davon mit
-der echten Spielphysik nach (`__lumi.debugTestLevel(welt, level)` in der Browser-Konsole). Aktueller Stand: **3095 von 3095 Sprüngen in 112 Leveln sind schaffbar.**
+der echten Spielphysik nach (`__lumi.debugTestLevel(welt, level)` in der Browser-Konsole). Aktueller Stand: **1952 von 1952 Sprüngen in 8 Reichen und 56 Herausforderungen sind schaffbar.**
 
 ## Steuerung
 
@@ -58,12 +97,13 @@ der echten Spielphysik nach (`__lumi.debugTestLevel(welt, level)` in der Browser
 | Drehattacke | F / J / Linksklick | X / B |
 | Stampfen (in der Luft) | Shift / C / Rechtsklick | LB / RB / Trigger |
 | Kamera | Maus (ins Bild klicken) / Q, E, R, V | rechter Stick |
+| Interagieren (Tore, Schiff, NPCs) | Enter / T | Y |
 | Pause | Esc / P | Start |
 | Ton an/aus | M | |
 
 Auf Handy und Tablet erscheinen Touch-Steuerelemente (Stick links, Knöpfe rechts, Kamera durch Wischen).
 
-Fortschritt wird im Browser gespeichert (`localStorage`). Mit `lumi.html?w=4&l=0` startet man direkt in ein Level (Welt 5, Level 1; zum Testen).
+Fortschritt wird im Browser gespeichert (`localStorage`). Zum Testen: `lumi.html?w=4` startet direkt im Reich 5, `lumi.html?w=4&l=0` in dessen erster Herausforderung.
 
 ## Entwickeln
 
@@ -81,7 +121,8 @@ node tools/store-art.cjs   # Store-Grafiken nach ./store
 | `src/player.js` | Lumis Steuerung, Physik, Animation |
 | `src/world.js` | Level-Bausteine (Plattformen, Gegner, Fallen, Deko) |
 | `src/worlds.js` | die 8 Welten: Farben, Mechaniken, Gegner, Bosse |
-| `src/generator.js` | prozeduraler Level-Generator inkl. Geheimnisse |
+| `src/generator.js` | prozeduraler Generator für Reiche (offene Welt) und Herausforderungen |
+| `src/gfx.js` | Grafikstufen, Bloom, 4K |
 | `src/levels.js` | handgebaute Level |
 | `src/boss.js` | Bosse (parametrisiert pro Welt) |
 | `src/i18n/` | alle Texte in 6 Sprachen |

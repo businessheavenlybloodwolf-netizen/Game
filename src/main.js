@@ -1,6 +1,6 @@
-// LUMI und das Morgenlicht – Hauptspiel
+// LUMI und das Morgenlicht – Hauptspiel (offene Reiche + Herausforderungen)
 import * as THREE from 'three';
-import { createTextures } from './textures.js';
+import { createTextures, setTextureQuality, setAnisotropy } from './textures.js';
 import { setTextures } from './models.js';
 import { GameAudio } from './audio.js';
 import { Input } from './input.js';
@@ -8,19 +8,29 @@ import { Particles } from './particles.js';
 import { Player } from './player.js';
 import { Level } from './world.js';
 import { HANDMADE } from './levels.js';
-import { WORLDS, WORLD_REQ, BOSS_IDX, BONUS_IDX, LEVELS_PER_WORLD } from './worlds.js';
+import { WORLDS, BOSS_IDX, BONUS_IDX } from './worlds.js';
 import { HUD } from './ui.js';
+import { Graphics, PRESETS, ORDER, loadPreset, savePreset } from './gfx.js';
 import { t, setLang, detectLang, LANGS, getLang } from './i18n/index.js';
 
 const STEP = 1 / 120;
-const SAVE_KEY = 'lumi_save_v2';
+const SAVE_KEY = 'lumi_save_v3';
+// Mondsplitter pro Reich: 20 in der offenen Welt, je 4 in 5 Herausforderungen, 4 im Bonus-Tor, 3 (großer Splitter) beim Boss
+const OPEN_IDS = ['peak0', 'peak1', 'peak2', 'peak3', 'peak4', 'branch0', 'branch1', 'branch2', 'hid0', 'hid1', 'hid2',
+  'pound0', 'pound1', 'crate0', 'crate1', 'pieces', 'lost', 'rings', 'shop', 'nest'];
+const CH_IDS = (p) => [p + 'g', p + 'm0', p + 'm1', p + 'm2'];
+const ALL_IDS = [...OPEN_IDS, ...[0, 1, 2, 3, 4].flatMap((i) => CH_IDS('c' + i)), ...CH_IDS('b'), 'boss'];
+const KINGDOM_TOTAL = ALL_IDS.length + 2; // Boss zählt 3
+const TRAVEL_REQ = [10, 12, 14, 16, 18, 20, 22];
+const SHOP_PRICE = 100;
 
 function controlsHtml() {
   const c = (k) => t('controls.' + k);
   const row = (a, b, p) => `<tr><td>${c(a)}</td><td>${b}</td><td>${p}</td></tr>`;
   return `<table class="controls"><tr><th></th><th>${c('keyboard')}</th><th>${c('gamepad')}</th></tr>
 ${row('run', c('kRun'), c('pRun'))}${row('jump', c('kJump'), 'A')}${row('spin', c('kSpin'), 'X / B')}
-${row('pound', c('kPound'), 'LB / RB')}${row('camera', c('kCam'), c('pCam'))}${row('pause', c('kPause'), 'Start')}${row('mute', 'M', '')}
+${row('pound', c('kPound'), 'LB / RB')}${row('camera', c('kCam'), c('pCam'))}<tr><td>${t('ui.interact')}</td><td>Enter / T</td><td>Y</td></tr>
+${row('pause', c('kPause'), 'Start')}${row('mute', 'M', '')}
 </table><p class="tip">${c('tip')}</p>`;
 }
 
@@ -28,15 +38,16 @@ class Game {
   constructor() {
     setLang(detectLang());
     this.t = t;
+    const preset = loadPreset();
+    setTextureQuality(PRESETS[preset].tex);
+    setAnisotropy(PRESETS[preset].aniso);
     const canvas = document.getElementById('game');
     this.canvas = canvas;
     const renderer = this.renderer = new THREE.WebGLRenderer({ canvas, antialias: true, powerPreference: 'high-performance' });
-    renderer.setPixelRatio(Math.min(window.devicePixelRatio, matchMedia('(pointer: coarse)').matches ? 1.5 : 2));
-    renderer.setSize(window.innerWidth, window.innerHeight);
     renderer.shadowMap.enabled = true;
-    renderer.shadowMap.type = THREE.PCFSoftShadowMap;
     this.scene = new THREE.Scene();
-    this.camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.1, 2000);
+    this.camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.1, 2500);
+    this.gfx = new Graphics(renderer, this.scene, this.camera, preset);
     this.T = createTextures(); setTextures(this.T);
     this.audio = new GameAudio();
     this.input = new Input(canvas);
@@ -51,17 +62,16 @@ class Game {
     this.shakeT = 0;
     this.acc = 0;
     this.save = this.loadSave();
-    this.lives = 3; this.hearts = 3; this.sparks = 0;
+    this.hearts = 3; this.sparks = this.save.sparks || 0; this.lives = 0;
     this.levelGot = 0; this.levelTime = 0; this.timer = 0;
     this.lighthouseLit = false;
     this.state = 'title';
-    this.mapWorld = 0;
     this.applyLangToDom();
 
     window.addEventListener('resize', () => {
       this.camera.aspect = window.innerWidth / window.innerHeight;
       this.camera.updateProjectionMatrix();
-      renderer.setSize(window.innerWidth, window.innerHeight);
+      this.gfx.resize();
     });
     const unlockAudio = () => this.audio.init();
     window.addEventListener('pointerdown', unlockAudio);
@@ -76,10 +86,12 @@ class Game {
     });
 
     const params = new URLSearchParams(location.search);
-    if (params.has('lang')) setLang(params.get('lang'));
+    if (params.has('lang')) { setLang(params.get('lang')); this.applyLangToDom(); }
     if (params.has('promo')) { this.applyLangToDom(); this.startPromo(params); }
     else if (params.has('w')) {
-      this.startLevel(+params.get('w') || 0, +params.get('l') || 0, true);
+      const w = +params.get('w') || 0;
+      if (params.has('l')) this.startLevel(w, +params.get('l') || 0);
+      else this.enterKingdom(w);
     } else this.toTitle();
     this.last = performance.now();
     this.frame = this.frame.bind(this);
@@ -90,58 +102,53 @@ class Game {
     document.querySelector('[data-btn="jump"]').textContent = t('ui.jump');
     document.querySelector('[data-btn="spin"]').textContent = t('ui.spin');
     document.querySelector('[data-btn="pound"]').textContent = t('ui.pound');
+    document.querySelector('[data-btn="act"]').textContent = '!';
     document.querySelector('#dialog .next').textContent = t('ui.next') + ' ▶';
     document.title = 'LUMI – ' + t('ui.subtitle');
   }
 
   // ---------------- Fortschritt ----------------
   spec(w, i) {
+    if (i < 0) return { world: w, index: -1, kind: 'kingdom', seed: (w + 1) * 7777 + 3 };
     const kind = i === BOSS_IDX ? 'boss' : i === BONUS_IDX ? 'bonus' : 'normal';
-    const star = !!this.star;
-    const s = { world: w, index: i, kind, star, seed: (w + 1) * 1000 + i * 37 + 5 + (star ? 50000 : 0) };
-    if (i === 0 && HANDMADE[w] && !star) { s.build = HANDMADE[w].build; s.seed = HANDMADE[w].seed; }
+    const s = { world: w, index: i, kind, seed: (w + 1) * 1000 + i * 37 + 5, idPrefix: kind === 'bonus' ? 'b' : 'c' + i };
+    if (i === 0 && HANDMADE[w]) { s.build = HANDMADE[w].build; s.seed = HANDMADE[w].seed; }
     return s;
   }
-  pre() { return this.star ? 's' : ''; }
   levelName(w, i) {
+    if (i < 0) return t(`worlds.${w}.name`);
     if (i === BOSS_IDX) return t(`worlds.${w}.boss`);
     if (i === BONUS_IDX) return t('ui.bonusLevel');
     return t(`worlds.${w}.levels.${i}`);
   }
   rec(w, i) {
-    const k = this.pre() + w + '-' + i;
-    if (!this.save.levels[k]) this.save.levels[k] = { done: false, ms: [0, 0, 0], best: 0, all: false, time: 0, medal: false };
+    const k = w + '-' + i;
+    if (!this.save.levels[k]) this.save.levels[k] = { done: false, best: 0, all: false, time: 0, medal: false };
     return this.save.levels[k];
   }
-  hasMoonstone(spec, idx) { return !!this.rec(spec.world, spec.index).ms[idx]; }
-  hasKey(w) { return !!this.save.keys[this.pre() + w]; }
-  moonCount(star = this.star) { let n = 0; for (const k in this.save.levels) if ((k[0] === 's') === !!star) n += this.save.levels[k].ms.reduce((a, b) => a + b, 0); return n; }
-  moonTotal() { return WORLDS.length * 6 * 3; }
+  moons(w) { if (!this.save.moons[w]) this.save.moons[w] = {}; return this.save.moons[w]; }
+  hasMoon(w, id) { return !!this.moons(w)[id]; }
+  moonCount(w) { return Object.values(this.moons(w)).reduce((a, b) => a + b, 0); }
+  moonCountAll() { let n = 0; for (let w = 0; w < WORLDS.length; w++) n += this.moonCount(w); return n; }
+  moonTotalAll() { return KINGDOM_TOTAL * WORLDS.length; }
+  hasKey(w) { return !!this.save.keys[w]; }
   shardCount() { let n = 0; for (let w = 0; w < 7; w++) if (this.save.bosses[w]) n++; return n; }
-  starOpen() { return !!this.save.bosses[7]; }
-  worldOpen(w) {
-    if (this.star) return this.starOpen() && (w === 0 || !!this.save.bosses['s' + (w - 1)]);
-    return w === 0 || (!!this.save.bosses[w - 1] && this.moonCount() >= WORLD_REQ[w]);
+  bossReq(w) { return 5 + w; }
+  bossOpen(w) { return this.moonCount(w) >= this.bossReq(w); }
+  challengeSub(w, i) {
+    const ids = CH_IDS(i === BONUS_IDX ? 'b' : 'c' + i);
+    return `☾ ${ids.filter((id) => this.hasMoon(w, id)).length} / 4`;
   }
-  levelOpen(w, i) {
-    if (!this.worldOpen(w)) return false;
-    if (i === 0) return true;
-    if (i === BONUS_IDX) return this.hasKey(w);
-    return this.rec(w, i - 1).done;
-  }
-  lockReason(w, i) {
-    if (!this.worldOpen(w)) return w > 0 && !this.save.bosses[this.pre() + (w - 1)] ? t('ui.needBoss', { n: w }) : t('ui.needMoonstones', { n: WORLD_REQ[w] });
-    if (i === BONUS_IDX) return t('ui.needKey');
-    return t('ui.needLevels');
-  }
-  hasProgress() { return Object.values(this.save.levels).some((r) => r.done || r.ms.some((v) => v)) || Object.keys(this.save.seen).length > 0; }
+  kingdomOpen(w) { return w === 0 || (!!this.save.bosses[w - 1] && this.moonCount(w - 1) >= TRAVEL_REQ[w - 1]); }
+  travelReason(w) { return t('ui.needTravel', { boss: t(`worlds.${w - 1}.boss`), n: TRAVEL_REQ[w - 1], name: t(`worlds.${w - 1}.name`) }); }
+  hasProgress() { return Object.values(this.save.moons).some((m) => Object.keys(m).length) || Object.keys(this.save.seen).length > 0; }
 
   // ---------------- Speicherstand ----------------
+  emptySave() { return { moons: {}, levels: {}, keys: {}, bosses: {}, seen: {}, sparks: 0, kingdom: 0 }; }
   loadSave() {
-    const empty = { levels: {}, keys: {}, bosses: {}, seen: {}, sparks: 0 };
-    try { return { ...empty, ...(JSON.parse(localStorage.getItem(SAVE_KEY)) || {}) }; } catch (e) { return empty; }
+    try { return { ...this.emptySave(), ...(JSON.parse(localStorage.getItem(SAVE_KEY)) || {}) }; } catch (e) { return this.emptySave(); }
   }
-  writeSave() { try { localStorage.setItem(SAVE_KEY, JSON.stringify(this.save)); } catch (e) { /* egal */ } }
+  writeSave() { this.save.sparks = this.sparks; try { localStorage.setItem(SAVE_KEY, JSON.stringify(this.save)); } catch (e) { /* egal */ } }
 
   // ---------------- Level laden ----------------
   loadLevel(w, i) {
@@ -158,35 +165,55 @@ class Game {
     this.camTarget.set(s.x, s.y + 1.3, s.z);
     this.hud.hideBoss();
     this.hud.hint(null);
+    this.hud.prompt(null);
+    this.hud.setRace(null);
   }
+  get inKingdom() { return this.cur && this.cur.i < 0; }
 
   // ---------------- Menüs ----------------
   toTitle() {
     this.state = 'title';
     this.input.releaseLock();
     this.lighthouseLit = false;
-    if (!this.level || this.cur.w !== 0 || this.cur.i !== 0) this.loadLevel(0, 0);
+    if (!this.level || this.cur.w !== 0 || this.cur.i !== -1) this.loadLevel(0, -1);
     this.hud.show(false);
     this.setTouch(false);
     this.audio.playMusic('title');
     const prog = this.hasProgress();
     const items = [];
-    if (prog) items.push({ label: t('ui.continue'), action: () => { this.star = false; this.showMap(this.save.lastWorld ?? 0); } });
+    if (prog) items.push({ label: t('ui.continue'), action: () => { this.hud.hideMenu(); this.enterKingdom(this.save.kingdom || 0); } });
     items.push({ label: t('ui.newGame'), action: () => (prog ? this.confirmNew() : this.newGame()) });
-    items.push({ label: `${t('ui.language')}: ${LANGS[getLang()].name}`, action: () => this.langMenu(() => this.toTitle()) });
-    items.push({ label: t('ui.controls'), action: () => this.showControls(() => this.toTitle()) });
-    items.push({ label: `${t('ui.sound')}: ${this.audio.muted ? t('ui.off') : t('ui.on')}`, action: () => { this.audio.toggleMute(); this.toTitle(); } });
-    items.push({ label: t('ui.fullscreen'), action: () => { this.toggleFullscreen(); } });
+    items.push(...this.settingsItems(() => this.toTitle()));
     if (window.lumiDesktop) items.push({ label: t('ui.quit'), action: () => window.lumiDesktop.quit() });
     this.hud.showMenu({ cls: 'title-screen', title: '<span class="logo">LUMI</span>', subtitle: t('ui.subtitle'), items });
+  }
+
+  settingsItems(back) {
+    return [
+      { label: `${t('ui.graphics')}: ${t('ui.g_' + this.gfx.name)}`, action: () => this.cycleGraphics(back) },
+      { label: `${t('ui.language')}: ${LANGS[getLang()].name}`, action: () => this.langMenu(back) },
+      { label: t('ui.controls'), action: () => this.showControls(back) },
+      { label: `${t('ui.sound')}: ${this.audio.muted ? t('ui.off') : t('ui.on')}`, action: () => { this.audio.toggleMute(); back(); } },
+      { label: t('ui.fullscreen'), action: () => { this.toggleFullscreen(); } },
+    ];
+  }
+
+  cycleGraphics(back) {
+    const next = ORDER[(ORDER.indexOf(this.gfx.name) + 1) % ORDER.length];
+    const texChange = PRESETS[next].tex !== PRESETS[this.gfx.name].tex;
+    savePreset(next);
+    if (texChange) { this.writeSave(); location.reload(); return; }
+    this.gfx.apply(next);
+    if (this.level) { this.gfx.setupSun(this.level.sun); this.level.sky.material.uniforms.linOut.value = this.gfx.composer ? 1 : 0; }
+    back();
   }
 
   confirmNew() {
     this.hud.showMenu({
       title: t('ui.newGame') + '?',
-      body: `${t('ui.progress')}: ${this.moonCount()} ${t('ui.moonstones')} → 0`,
+      body: `${t('ui.progress')}: ☾ ${this.moonCountAll()} → 0`,
       items: [
-        { label: t('ui.newGame'), action: () => { this.save = { levels: {}, keys: {}, bosses: {}, seen: {}, sparks: 0 }; this.writeSave(); this.newGame(); } },
+        { label: t('ui.newGame'), action: () => { this.save = this.emptySave(); this.sparks = 0; this.writeSave(); this.newGame(); } },
         { label: t('ui.back'), action: () => this.toTitle() },
       ],
       sel: 1,
@@ -208,10 +235,10 @@ class Game {
 
   newGame() {
     this.hud.hideMenu();
-    this.lives = 3; this.sparks = 0;
+    this.sparks = 0;
     this.state = 'story';
     this.audio.playMusic('title');
-    this.dialog(t('story.intro'), () => this.playLevel(0, 0));
+    this.dialog(t('story.intro'), () => this.enterKingdom(0));
   }
 
   dialog(lines, done, w = 0) {
@@ -219,96 +246,136 @@ class Game {
     this.hud.dialog(conv, done);
   }
 
-  levelLabel(w, i) {
-    const r = this.rec(w, i);
-    const open = this.levelOpen(w, i);
-    const num = i === BOSS_IDX ? '☠' : i === BONUS_IDX ? '★' : `${w + 1}-${i + 1}`;
-    let icons = '';
-    if (i !== BOSS_IDX) icons += r.ms.map((v) => `<span class="moon ${v ? 'full' : ''}"></span>`).join('');
-    if (r.all) icons += ' <span class="spark-icon"></span>';
-    if (r.medal) icons += ' <span class="medal">⏱</span>';
-    if (i === 2 && this.hasKey(w)) icons += ' <span class="keyic">🗝</span>';
-    if (i === BOSS_IDX && r.done) icons += ' <span class="shard full"></span>';
-    const name = open ? this.levelName(w, i) : '???';
-    const sub = open ? '' : `<small>🔒 ${this.lockReason(w, i)}</small>`;
-    return `<span class="lvl"><span class="nm">${num} · ${name}${sub}</span><span class="ic">${icons}</span></span>`;
-  }
-
-  showMap(w, sel = null) {
-    w = Math.max(0, Math.min(WORLDS.length - 1, w));
-    this.mapWorld = w;
-    this.state = 'map';
-    this.hud.show(false);
-    this.setTouch(false);
-    this.input.releaseLock();
-    const open = this.worldOpen(w);
-    if (!this.level || this.cur.w !== w || this.cur.i !== 0 || !!this.level.spec.star !== !!this.star) this.loadLevel(w, 0);
-    this.audio.playMusic(open ? WORLDS[w].music : 'title');
-    const bar = WORLDS.map((W, k) => `<span class="${this.worldOpen(k) ? 'open' : ''} ${k === w ? 'cur' : ''}" style="background:${W.color}"></span>`).join('');
-    let wm = 0; for (let i = 0; i < LEVELS_PER_WORLD; i++) wm += this.rec(w, i).ms.reduce((a, b) => a + b, 0);
-    const body = `<div class="worldbar">${bar}</div>
-      <div><span class="moon full"></span> ${this.moonCount()} / ${this.moonTotal()} &nbsp; · &nbsp; ${t('ui.world', { n: w + 1 })}: ${wm} / 18 &nbsp; · &nbsp; ${this.shardCount()} / 7 <span class="shard full"></span></div>
-      ${this.moonCount() >= this.moonTotal() ? `<p>${t('ui.allMoonstones')}</p>` : ''}`;
-    const items = [];
-    if (open) {
-      for (let i = 0; i < LEVELS_PER_WORLD; i++) {
-        const lo = this.levelOpen(w, i);
-        items.push({ html: this.levelLabel(w, i), disabled: !lo, action: () => this.playLevel(w, i) });
-      }
-    } else {
-      items.push({ html: `<small>🔒 ${this.lockReason(w, 0)}</small>`, disabled: true, action: () => {} });
-    }
-    if (this.starOpen()) items.push({ label: this.star ? t('ui.normalPaths') : '✦ ' + t('ui.starPaths'), action: () => { this.star = !this.star; this.showMap(w); } });
-    if (w > 0) items.push({ label: t('ui.prevWorld'), action: () => this.showMap(w - 1) });
-    if (w < WORLDS.length - 1) items.push({ label: t('ui.nextWorld'), action: () => this.showMap(w + 1) });
-    items.push({ label: t('ui.mainMenu'), action: () => { this.hud.hideMenu(); this.toTitle(); } });
-    let defSel = sel;
-    if (defSel === null) { defSel = 0; for (let i = 0; i < LEVELS_PER_WORLD; i++) if (this.levelOpen(w, i) && !this.rec(w, i).done) { defSel = i; break; } }
-    this.hud.showMenu({
-      cls: 'map', title: `<div class="worldname" style="color:${WORLDS[w].color};text-shadow:0 3px 0 #3a1f14">${t(`worlds.${w}.name`)}</div>`,
-      subtitle: (this.star ? '✦ ' + t('ui.starPaths') + ' · ' : '') + (w === WORLDS.length - 1 ? t('ui.finale') : t('ui.world', { n: w + 1 })), body, items, sel: open ? defSel : items.findIndex((x) => !x.disabled),
-      onLeft: w > 0 ? () => this.showMap(w - 1) : null, onRight: w < WORLDS.length - 1 ? () => this.showMap(w + 1) : null,
-    });
-  }
-
-  playLevel(w, i) {
+  // ---------------- Reiche (offene Welt) ----------------
+  enterKingdom(w, from = null) {
     this.hud.hideMenu();
-    this.save.lastWorld = w; this.writeSave();
-    const before = t(`story.before.${w}`);
-    if (!this.star && !this.save.seen[w] && before && before.length) {
+    this.save.kingdom = w; this.writeSave();
+    this.loadLevel(w, -1);
+    if (from) {
+      const pt = this.level.portals.find((p) => p.target.type === from.type && p.target.i === from.i);
+      if (pt) {
+        const a = Math.atan2(pt.x, pt.z);
+        const dx = -Math.sin(pt.mesh ? 0 : 0);
+        this.player.reset(pt.x + Math.sin(a) * 0, pt.y, pt.z, 0);
+        // vor das Tor stellen (Richtung Inselmitte)
+        const iso = this.level.colliders.find((c) => c.type === 'cyl' && Math.hypot(c.x - pt.x, c.z - pt.z) < c.r && Math.abs(c.maxY - pt.y) < 0.1);
+        if (iso) { const vx = iso.x - pt.x, vz = iso.z - pt.z, l = Math.hypot(vx, vz) || 1; this.player.pos.x += vx / l * 2.8; this.player.pos.z += vz / l * 2.8; }
+        this.checkpoint = { x: this.player.pos.x, y: pt.y, z: this.player.pos.z, yaw: Math.atan2(pt.x - this.player.pos.x, pt.z - this.player.pos.z) };
+        this.camYaw = this.checkpoint.yaw; this.camTarget.copy(this.player.pos);
+        void dx;
+      }
+    }
+    this.hearts = 3; this.levelGot = 0; this.levelTime = 0;
+    this.hud.show(true);
+    this.refreshHud();
+    this.setTouch(true);
+    this.audio.playMusic(WORLDS[w].music);
+    const go = () => { this.state = 'play'; this.setTouch(true); this.hud.show(true); };
+    if (!this.save.seen[w]) {
       this.save.seen[w] = true; this.writeSave();
-      this.loadLevel(w, i);
       this.state = 'story';
       this.hud.show(false);
-      this.dialog(before, () => this.startLevel(w, i, true), w);
+      const lines = [...t(`story.before.${w}`), ...(w === 0 ? t('story.ship') : [])];
+      this.dialog(lines, () => { go(); this.hud.banner(t(`worlds.${w}.name`), t('ui.kingdom', { n: w + 1 })); }, w);
       return;
     }
-    this.startLevel(w, i);
+    go();
+    if (!from) this.hud.banner(t(`worlds.${w}.name`), t('ui.kingdom', { n: w + 1 }));
   }
 
-  startLevel(w, i, quick = false) {
-    if (!this.level || this.cur.w !== w || this.cur.i !== i || !quick || this.level.time > 0.5 || !!this.level.spec.star !== !!this.star) this.loadLevel(w, i);
+  interact(it) {
+    const w = this.cur.w;
+    if (it.kind === 'ship') { this.showTravel(); return; }
+    if (it.kind === 'portal') {
+      if (it.locked) { this.hud.toast(it.target.type === 'boss' ? t('ui.needMoonsBoss', { n: this.bossReq(w) }) : t('ui.needKey'), 2.5); this.audio.play('hurt'); return; }
+      this.enterChallenge(it.target);
+      return;
+    }
+    const npcName = t('npc.' + it.kind + 'Name');
+    const say = (key, after) => { this.state = 'story'; this.hud.dialog([{ role: 'e', who: npcName, text: t('npc.' + key, { n: SHOP_PRICE }) }], () => { this.state = 'play'; if (after) after(); }); };
+    const front = new THREE.Vector3(it.x + (this.player.pos.x - it.x) * 0.5, it.y + 2.2, it.z + (this.player.pos.z - it.z) * 0.5);
+    if (it.kind === 'shop') {
+      if (this.hasMoon(w, 'shop')) say('shopDone');
+      else if (this.sparks < SHOP_PRICE) say('shopPoor');
+      else say('shopSold', () => { this.sparks -= SHOP_PRICE; this.refreshHud(); this.level.spawnMoon(front, 'shop'); });
+    } else if (it.kind === 'lost') {
+      const L = this.level;
+      if (this.hasMoon(w, 'lost')) say('lostDone');
+      else if (L.lost && L.lost.state === 'carried') say('lostThanks', () => { L.lost.state = 'home'; L.lost.pos.set(it.x + 0.6, it.y + 0.3, it.z); this.level.spawnMoon(front, 'lost'); });
+      else say('lostAsk');
+    }
+  }
+
+  enterChallenge(target) {
+    const w = this.cur.w;
+    this.returnTo = { w, target };
+    const i = target.type === 'boss' ? BOSS_IDX : target.type === 'bonus' ? BONUS_IDX : target.i;
+    this.hud.fade(true);
+    this.audio.play('confirm');
+    setTimeout(() => { this.hud.fade(false); this.startLevel(w, i); }, 350);
+    this.state = 'transition';
+  }
+
+  showTravel() {
+    this.state = 'menu';
+    this.setTouch(false);
+    this.input.releaseLock();
+    const items = WORLDS.map((W, w) => {
+      const open = this.kingdomOpen(w);
+      const here = w === this.cur.w;
+      const sub = open ? (here ? t('ui.here') : '') : `🔒 ${this.travelReason(w)}`;
+      return {
+        html: `<span class="lvl"><span class="nm">${w + 1} · ${open ? t(`worlds.${w}.name`) : '???'}${sub ? `<small>${sub}</small>` : ''}</span><span class="ic">☾ ${this.moonCount(w)} / ${KINGDOM_TOTAL}${this.save.bosses[w] ? ' <span class="shard full"></span>' : ''}</span></span>`,
+        disabled: !open,
+        action: () => { if (here) this.resume(); else this.travelTo(w); },
+      };
+    });
+    items.push({ label: t('ui.back'), action: () => this.resume() });
+    this.hud.showMenu({ cls: 'map', title: `<div class="worldname">${t('ui.travel')}</div>`, subtitle: `☾ ${this.moonCountAll()} / ${this.moonTotalAll()}`, items, sel: this.cur.w });
+  }
+
+  travelTo(w) {
+    this.hud.hideMenu();
+    this.audio.play('bounce');
+    this.hud.fade(true);
+    this.state = 'transition';
+    setTimeout(() => { this.hud.fade(false); this.enterKingdom(w); }, 600);
+  }
+
+  moonList() {
+    const w = this.cur.w;
+    const label = (id) => {
+      const m = id.match(/^(peak|branch|hid|pound|crate)(\d)$/);
+      if (m) return `${t('moonTypes.' + m[1])} ${+m[2] + 1}`;
+      const c = id.match(/^(c(\d)|b)(g|m0|m1|m2)$/);
+      if (c) return `${c[2] !== undefined ? t(`worlds.${w}.levels.${c[2]}`) : t('ui.bonusLevel')}: ${t('moonTypes.' + { g: 'goal', m0: 'secret', m1: 'secret', m2: 'sparks' }[c[3]])}`;
+      return t('moonTypes.' + id);
+    };
+    const rows = ALL_IDS.map((id) => `<div class="mrow ${this.hasMoon(w, id) ? 'got' : ''}"><span class="moon ${this.hasMoon(w, id) ? 'full' : ''}"></span> ${this.hasMoon(w, id) ? label(id) : '? ? ?'}${id === 'boss' ? ' ×3' : ''}</div>`).join('');
+    this.hud.showMenu({ title: t('ui.moonList'), subtitle: `${t(`worlds.${w}.name`)} · ☾ ${this.moonCount(w)} / ${KINGDOM_TOTAL}`, body: `<div class="mlist">${rows}</div>`, items: [{ label: t('ui.back'), action: () => { this.state = 'play'; this.pause(); } }] });
+  }
+
+  startLevel(w, i) {
+    this.loadLevel(w, i);
     this.hearts = 3; this.levelGot = 0; this.levelTime = 0;
     this.hud.show(true);
     this.refreshHud();
     this.state = 'play';
     this.setTouch(true);
     this.audio.playMusic(i === BONUS_IDX ? 'bonus' : WORLDS[w].music);
-    this.hud.banner(this.levelName(w, i), `${this.star ? '✦ ' : ''}${t(`worlds.${w}.name`)} · ${i === BOSS_IDX ? t('ui.boss') : i === BONUS_IDX ? '★' : `${w + 1}-${i + 1}`}`);
+    this.hud.banner(this.levelName(w, i), `${t(`worlds.${w}.name`)} · ${i === BOSS_IDX ? t('ui.boss') : i === BONUS_IDX ? '★' : t('ui.challenge')}`);
   }
 
   refreshHud() {
     if (!this.level) return;
     this.hud.setHearts(this.hearts);
-    this.hud.setLives(this.lives);
-    this.hud.setSparks(this.sparks, this.levelGot, this.level.sparkTotal);
+    this.hud.setLives(null);
+    this.hud.setSparks(this.sparks, this.levelGot, this.inKingdom ? null : this.level.sparkTotal);
     this.hud.setShards(this.shardCount());
     const sp = this.level.spec;
-    if (sp.kind === 'boss') this.hud.setMoons(null);
-    else {
-      const r = this.rec(sp.world, sp.index);
-      this.hud.setMoons([0, 1, 2].map((k) => r.ms[k] || this.level.moonstones.some((m) => m.idx === k && m.taken)));
-    }
+    if (sp.kind === 'kingdom') this.hud.setMoonCount(this.moonCount(sp.world), KINGDOM_TOTAL);
+    else if (sp.kind === 'boss') this.hud.setMoons(null);
+    else this.hud.setMoons([sp.idPrefix + 'g', sp.idPrefix + 'm0', sp.idPrefix + 'm1', sp.idPrefix + 'm2'].map((id) => this.hasMoon(sp.world, id)));
   }
 
   setTouch(v) { document.getElementById('touch').classList.toggle('active', v); }
@@ -320,20 +387,17 @@ class Game {
     this.input.releaseLock();
     const { w, i } = this.cur;
     const again = () => { this.state = 'play'; this.pause(); };
-    this.hud.showMenu({
-      title: t('ui.pause'),
-      subtitle: `${t(`worlds.${w}.name`)} · ${this.levelName(w, i)}`,
-      items: [
-        { label: t('ui.resume'), action: () => this.resume() },
-        { label: t('ui.restartLevel'), action: () => { this.hud.hideMenu(); this.startLevel(w, i); } },
-        { label: t('ui.worldMap'), action: () => this.showMap(w) },
-        { label: t('ui.controls'), action: () => this.showControls(again) },
-        { label: `${t('ui.language')}: ${LANGS[getLang()].name}`, action: () => this.langMenu(again) },
-        { label: `${t('ui.sound')}: ${this.audio.muted ? t('ui.off') : t('ui.on')}`, action: () => { this.audio.toggleMute(); again(); } },
-        { label: t('ui.fullscreen'), action: () => this.toggleFullscreen() },
-        { label: t('ui.mainMenu'), action: () => { this.hud.hideMenu(); this.toTitle(); } },
-      ],
-    });
+    const items = [{ label: t('ui.resume'), action: () => this.resume() }];
+    if (this.inKingdom) {
+      items.push({ label: t('ui.moonList'), action: () => this.moonList() });
+      items.push({ label: t('ui.toShip'), action: () => { this.hud.hideMenu(); this.enterKingdom(w); } });
+    } else {
+      items.push({ label: t('ui.restartLevel'), action: () => { this.hud.hideMenu(); this.startLevel(w, i); } });
+      items.push({ label: t('ui.leaveChallenge'), action: () => { this.hud.hideMenu(); this.enterKingdom(w, this.returnTo && this.returnTo.target); } });
+    }
+    items.push(...this.settingsItems(again));
+    items.push({ label: t('ui.mainMenu'), action: () => { this.writeSave(); this.hud.hideMenu(); this.toTitle(); } });
+    this.hud.showMenu({ title: t('ui.pause'), subtitle: `${t(`worlds.${w}.name`)}${this.inKingdom ? '' : ' · ' + this.levelName(w, i)} · ☾ ${this.moonCount(w)} / ${KINGDOM_TOTAL}`, items });
   }
 
   toggleFullscreen() {
@@ -346,8 +410,7 @@ class Game {
 
   // Präsentationsmodus für Store-Grafiken: ?promo=1&w=..&l=..&a=winkel&d=abstand&h=höhe&logo=center|left|none
   startPromo(p) {
-    const w = +p.get('w') || 0, i = +p.get('l') || 0;
-    this.star = p.get('star') === '1';
+    const w = +p.get('w') || 0, i = p.has('l') ? +p.get('l') : -1;
     this.loadLevel(w, i);
     this.state = 'promo';
     this.hud.show(false);
@@ -358,7 +421,6 @@ class Game {
     pl.reset(sp.x + this.promo.fx, sp.y, sp.z + this.promo.fz, p.has('face') ? +p.get('face') : this.promo.a);
     for (const cp of this.level.checkpoints) cp.mesh.visible = false;
     if (p.has('boss') && this.level.boss) {
-      // hinter Lumi an der Arena-Kante, Blick auf den Boss
       const b = this.level.boss, c = b.center;
       const cp = this.level.checkpoints[this.level.checkpoints.length - 1];
       const dx = cp.x - c.x, dz = cp.z - c.z, l = Math.hypot(dx, dz);
@@ -390,13 +452,8 @@ class Game {
     if (!bonus) this.levelGot += n;
     this.audio.play('spark');
     if (pos) this.particles.burst(pos, { count: 6, color: [0xffe066, 0xffffff], speed: 3, size: 0.5, tex: 'sparkle', additive: true, life: 0.5 });
-    while (this.sparks >= 100) {
-      this.sparks -= 100; this.lives++;
-      this.audio.play('oneup');
-      this.hud.toast(t('ui.oneUp'));
-    }
     const L = this.level;
-    if (!bonus && L.spec.kind !== 'boss' && !L.allSparksDone && L.sparkTotal > 0 && this.levelGot >= L.sparkTotal) {
+    if (!bonus && (L.spec.kind === 'normal' || L.spec.kind === 'bonus') && !L.allSparksDone && L.sparkTotal > 0 && this.levelGot >= L.sparkTotal) {
       L.allSparksDone = true;
       this.hud.toast(t('ui.moonstoneAll'), 3);
       L.spawnSparkMoonstone(this.player.pos);
@@ -404,21 +461,29 @@ class Game {
     this.refreshHud();
   }
 
-  collectMoonstone(idx, pos) {
-    const r = this.rec(this.cur.w, this.cur.i);
-    const fresh = !r.ms[idx];
-    r.ms[idx] = 1; this.writeSave();
+  collectMoon(id, pos) {
+    const w = this.cur.w;
+    const fresh = !this.hasMoon(w, id);
+    const before = this.moonCount(w);
+    this.moons(w)[id] = id === 'boss' ? 3 : 1;
+    this.writeSave();
     this.audio.play(fresh ? 'shard' : 'heart');
-    this.hud.toast(fresh ? t('ui.moonstone') : t('ui.moonstoneOld'), 2.5);
-    this.particles.burst(pos, { count: 24, color: [0x9ab8ff, 0xffffff, 0xd8e8ff], speed: 7, size: 0.8, tex: 'sparkle', additive: true, life: 0.9 });
+    this.particles.burst(pos, { count: 28, color: [0x9ab8ff, 0xffffff, 0xd8e8ff], speed: 7, size: 0.9, tex: 'sparkle', additive: true, life: 1 });
+    if (fresh) {
+      this.hud.banner(t('ui.moonShard'), `☾ ${this.moonCount(w)} / ${KINGDOM_TOTAL}`, 2.2);
+      const now = this.moonCount(w);
+      if (before < this.bossReq(w) && now >= this.bossReq(w) && this.inKingdom) { this.hud.toast(t('ui.gateOpen'), 3.5); this.level.unlockBossPortal && this.level.unlockBossPortal(); }
+      if (w < 7 && this.save.bosses[w] && before < TRAVEL_REQ[w] && now >= TRAVEL_REQ[w]) this.hud.toast(t('ui.shipReady'), 3.5);
+    } else this.hud.toast(t('ui.moonstoneOld'), 2);
     this.refreshHud();
   }
 
   collectKey(pos) {
-    this.save.keys[this.pre() + this.cur.w] = true; this.writeSave();
+    this.save.keys[this.cur.w] = true; this.writeSave();
     this.audio.play('oneup');
     this.hud.toast(t('ui.keyFound'), 3.5);
     this.particles.burst(pos, { count: 24, color: [0xffe066, 0xffffff], speed: 7, size: 0.8, tex: 'sparkle', additive: true });
+    if (this.level.unlockBonusPortal) this.level.unlockBonusPortal();
   }
 
   addHeart(pos) {
@@ -453,13 +518,16 @@ class Game {
     this.hud.fade(true);
   }
 
+  // kein Game Over: Lumi verliert 10 Funken und leuchtet am letzten Checkpoint wieder auf
   playerDied() {
     this.player.alive = false;
     this.audio.play('die');
     this.particles.burst(new THREE.Vector3(this.player.pos.x, this.player.pos.y + 0.6, this.player.pos.z), { count: 20, color: [0xffc070, 0xffffff], speed: 5, size: 0.7, tex: 'glow', additive: true });
-    this.lives--;
+    const lost = Math.min(10, this.sparks);
+    this.sparks -= lost;
+    if (lost) this.hud.toast(t('ui.lostSparks', { n: lost }), 2);
     this.refreshHud();
-    this.state = 'dying'; this.timer = 1.6;
+    this.state = 'dying'; this.timer = 1.4;
   }
 
   respawn() {
@@ -468,23 +536,10 @@ class Game {
     this.player.reset(c.x, c.y, c.z + 0.01, this.camYaw + Math.PI);
     this.player.invuln = 1.2;
     this.camTarget.set(c.x, c.y + 1.3, c.z);
+    if (this.level.lost && this.level.lost.state === 'carried') { const L = this.level.lost; L.state = 'lying'; L.pos.set(L.home.x, L.home.y, L.home.z); }
   }
 
-  gameOver() {
-    this.state = 'gameover';
-    this.setTouch(false);
-    this.input.releaseLock();
-    this.audio.stopMusic();
-    const { w, i } = this.cur;
-    this.hud.showMenu({
-      title: t('ui.gameOverTitle'), subtitle: t('ui.gameOverSub'),
-      items: [
-        { label: t('ui.tryAgain'), action: () => { this.hud.hideMenu(); this.lives = 3; this.startLevel(w, i); } },
-        { label: t('ui.worldMap'), action: () => { this.lives = 3; this.showMap(w); } },
-      ],
-    });
-  }
-
+  // Ziel einer Herausforderung / Kristall nach dem Boss
   collectShard(goal) {
     this.state = 'clear'; this.timer = 0;
     this.setTouch(false);
@@ -501,8 +556,8 @@ class Game {
     const r = this.rec(w, i);
     this.wasDone = r.done;
     r.done = true;
-    if (boss) this.save.bosses[this.pre() + w] = true;
-    this.newBest = this.levelGot > r.best;
+    if (boss) this.save.bosses[w] = true;
+    this.moons(w)[boss ? 'boss' : this.level.spec.idPrefix + 'g'] = boss ? 3 : 1;
     r.best = Math.max(r.best, this.levelGot);
     if (this.level.allSparksDone) r.all = true;
     this.gotMedal = !boss && this.levelTime <= this.level.par;
@@ -510,7 +565,7 @@ class Game {
     r.time = r.time ? Math.min(r.time, this.levelTime) : this.levelTime;
     this.writeSave();
     this.refreshHud();
-    this.hud.banner(final ? t('ui.coreFound') : boss ? t('ui.shardFound') : t('ui.goal'), boss && !final ? t('ui.shardCount', { n: this.shardCount() }) : '', 2.6);
+    this.hud.banner(final ? t('ui.coreFound') : boss ? t('ui.shardFound') : t('ui.moonShard'), boss && !final ? t('ui.shardCount', { n: this.shardCount() }) + ' · ☾ +3' : `☾ ${this.moonCount(w)} / ${KINGDOM_TOTAL}`, 2.6);
   }
 
   showClear() {
@@ -520,31 +575,29 @@ class Game {
     this.state = 'clearmenu';
     this.audio.play('clear');
     const fmt = (x) => `${Math.floor(x / 60)}:${String(Math.floor(x % 60)).padStart(2, '0')}`;
-    const r = this.rec(w, i);
     let body = `<div class="stats"><div><span class="spark-icon"></span> ${t('ui.sparks')}: <b>${this.levelGot} / ${this.level.sparkTotal}</b></div>
       <div>⏱ ${t('ui.time')}: <b>${fmt(this.levelTime)}</b>${boss ? '' : ` &nbsp;(${t('ui.par')}: ${fmt(this.level.par)})`}</div>`;
-    if (!boss) body += `<div class="moonsrow">${r.ms.map((v) => `<span class="moon ${v ? 'full' : ''}"></span>`).join('')}</div>`;
+    if (!boss) { const p = this.level.spec.idPrefix; body += `<div class="moonsrow">${['g', 'm0', 'm1', 'm2'].map((k) => `<span class="moon ${this.hasMoon(w, p + k) ? 'full' : ''}"></span>`).join('')}</div>`; }
     if (this.gotMedal) body += `<div class="medal">⏱ ${t('ui.medal')}</div>`;
     body += '</div>';
-    const toMap = () => this.showMap(w);
+    const back = () => this.enterKingdom(w, this.returnTo ? this.returnTo.target : { type: boss ? 'boss' : 'challenge', i });
     const items = [];
     if (boss) {
       items.push({
         label: t('ui.next'), action: () => {
           this.hud.hideMenu();
           this.state = 'story';
-          const after = t(`story.after.${w}`);
-          this.dialog(after, () => {
+          this.dialog(t(`story.after.${w}`), () => {
             if (final) { this.ending(); return; }
-            this.showMap(w + 1);
-            if (this.worldOpen(w + 1) && !this.wasDone) this.hud.toast(t('ui.worldUnlocked', { name: t(`worlds.${w + 1}.name`) }), 3.5);
+            back();
+            if (this.moonCount(w) >= TRAVEL_REQ[w]) this.hud.toast(t('ui.shipReady'), 3.5);
+            else this.hud.toast(t('ui.needMoonsShip', { n: TRAVEL_REQ[w] }), 3.5);
           }, w);
         },
       });
     } else {
-      const nxt = i < BOSS_IDX - 1 || i === BOSS_IDX - 1 ? i + 1 : null;
-      if (nxt !== null && i !== BONUS_IDX && this.levelOpen(w, nxt)) items.push({ label: `${t('ui.next')}: ${this.levelName(w, nxt)}`, action: () => this.playLevel(w, nxt) });
-      items.push({ label: t('ui.worldMap'), action: toMap });
+      items.push({ label: t('ui.backToKingdom'), action: back });
+      items.push({ label: t('ui.restartLevel'), action: () => { this.hud.hideMenu(); this.startLevel(w, i); } });
     }
     this.hud.showMenu({ title: boss ? t('ui.bossDefeated', { name: this.levelName(w, i) }) : t('ui.cleared', { name: this.levelName(w, i) }), body, items });
   }
@@ -563,13 +616,13 @@ class Game {
     this.player.mesh.visible = false;
     this.audio.playMusic('ending');
     this.dialog(t('story.ending'), () => {
-      const all = this.moonCount() >= this.moonTotal();
+      const all = this.moonCountAll() >= this.moonTotalAll();
       this.hud.showMenu({
         cls: 'title-screen',
         title: `<span class="logo">${t('ui.theEnd')}</span>`,
         subtitle: t('ui.thanks'),
-        body: `<p>${t('ui.endText')}</p><p>✦ ${t('ui.starUnlocked')}</p><p><span class="moon full"></span> ${this.moonCount()} / ${this.moonTotal()}</p>${all ? `<p>${t('ui.allMoonstones')}</p>` : ''}<p class="credits">${t('ui.credits')}</p>`,
-        items: [{ label: '✦ ' + t('ui.starPaths'), action: () => { this.star = true; this.showMap(0); } }, { label: t('ui.mainMenu'), action: () => { this.hud.hideMenu(); this.toTitle(); } }],
+        body: `<p>${t('ui.endText')}</p><p>☾ ${this.moonCountAll()} / ${this.moonTotalAll()}</p>${all ? `<p>${t('ui.allMoonstones')}</p>` : `<p>${t('ui.keepSearching')}</p>`}<p class="credits">${t('ui.credits')}</p>`,
+        items: [{ label: t('ui.continue'), action: () => this.enterKingdom(7) }, { label: t('ui.mainMenu'), action: () => { this.hud.hideMenu(); this.toTitle(); } }],
       });
     });
   }
@@ -619,6 +672,12 @@ class Game {
     return { timeout: true, at: p.pos.toArray().map((v) => +v.toFixed(2)), y: p.pos.y };
   }
 
+  promptText(it) {
+    if (it.kind === 'ship') return t('ui.travel');
+    if (it.kind === 'portal') return `${t('ui.enter')}: ${it.name}`;
+    return `${t('ui.talk')}: ${t('npc.' + it.kind + 'Name')}`;
+  }
+
   banner(t, s) { this.hud.banner(t, s); }
   shake(a) { this.shakeT = Math.max(this.shakeT, a); }
 
@@ -629,7 +688,7 @@ class Game {
     this.last = now;
     const input = this.input;
     input.pollPad();
-    if (input.pressed.has('KeyM')) { const m = this.audio.toggleMute(); this.hud.toast(m ? 'Ton aus' : 'Ton an', 1); }
+    if (input.pressed.has('KeyM')) { const m = this.audio.toggleMute(); this.hud.toast(t(m ? 'ui.soundOff' : 'ui.soundOn'), 1); }
 
     if (this.hud.dialogOpen) this.hud.dialogInput(input);
     else if (this.hud.menu) this.hud.menuInput(input);
@@ -639,8 +698,14 @@ class Game {
       case 'play':
         if (input.pausePressed()) { this.pause(); break; }
         this.simulate(dt);
+        if (this.state !== 'play') break;
         this.hud.hint(L.checkpointHint(this.player));
-        this.hud.setTimer(this.levelTime);
+        this.hud.setTimer(this.inKingdom ? null : this.levelTime);
+        {
+          const it = L.nearestInteractable(this.player.pos);
+          this.hud.prompt(it ? this.promptText(it) : null);
+          if (it && input.interactPressed()) this.interact(it);
+        }
         break;
       case 'paused':
         if (input.pausePressed()) this.resume();
@@ -657,8 +722,7 @@ class Game {
         if (this.timer <= 0.4) this.hud.fade(true);
         if (this.timer <= 0) {
           this.hud.fade(false);
-          if (this.lives <= 0) this.gameOver();
-          else { this.hearts = 3; this.refreshHud(); this.respawn(); this.state = 'play'; }
+          this.hearts = 3; this.refreshHud(); this.respawn(); this.state = 'play';
         }
         break;
       case 'clear':
@@ -679,7 +743,7 @@ class Game {
     this.updateCamera(dt);
     L.updateSun(this.camTarget);
     this.hud.update(dt);
-    this.renderer.render(this.scene, this.camera);
+    this.gfx.render();
     input.endFrame();
   }
 
@@ -717,7 +781,7 @@ class Game {
       cam.lookAt(p0.x, p0.y + pr.look, p0.z);
       return;
     }
-    if (this.state === 'title' || this.state === 'map' || this.state === 'ending' || (this.state === 'story' && !this.hud.el.hud.classList.contains('show'))) {
+    if (this.state === 'title' || this.state === 'ending' || (this.state === 'story' && !this.hud.el.hud.classList.contains('show'))) {
       const t = performance.now() / 1000;
       let c = this.level.spawnPoint, dist = 16, h = 5;
       if (this.state === 'ending' && this.level.lighthouseObj) { c = this.level.lighthouseObj.position; dist = 34; h = 10; }
