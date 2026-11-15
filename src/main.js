@@ -86,6 +86,13 @@ class Game {
       wasLocked = l;
     });
 
+    // Autospeichern: alle 15 s im Spiel sowie beim Schließen/Minimieren des Fensters
+    setInterval(() => { if (this.state === 'play' && this.sparks !== this.save.sparks) this.writeSave(false); }, 15000);
+    const flush = () => { if (this.state !== 'title' && this.state !== 'promo') this.writeSave(false); };
+    window.addEventListener('beforeunload', flush);
+    window.addEventListener('pagehide', flush);
+    document.addEventListener('visibilitychange', () => { if (document.hidden) flush(); });
+
     const params = new URLSearchParams(location.search);
     if (params.has('lang')) { setLang(params.get('lang')); this.applyLangToDom(); }
     if (params.has('promo')) { this.applyLangToDom(); this.startPromo(params); }
@@ -149,7 +156,12 @@ class Game {
   loadSave() {
     try { return { ...this.emptySave(), ...(JSON.parse(localStorage.getItem(SAVE_KEY)) || {}) }; } catch (e) { return this.emptySave(); }
   }
-  writeSave() { this.save.sparks = this.sparks; try { localStorage.setItem(SAVE_KEY, JSON.stringify(this.save)); } catch (e) { /* egal */ } }
+  writeSave(show = true) {
+    this.save.sparks = this.sparks;
+    this.save.savedAt = Date.now();
+    try { localStorage.setItem(SAVE_KEY, JSON.stringify(this.save)); } catch (e) { return; }
+    if (show && this.hud) this.hud.saved(t('ui.saved'));
+  }
 
   // ---------------- Level laden ----------------
   loadLevel(w, i) {

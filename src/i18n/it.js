@@ -1,6 +1,7 @@
 export default {
   name: 'Italiano',
   ui: {
+    saved: 'Salvato',
     peak: "Vetta",
     needMoonsBoss: "Si apre con {n} frammenti di luna",
     challenge: "Sfida",

@@ -1,6 +1,7 @@
 export default {
   name: 'English',
   ui: {
+    saved: 'Saved',
     peak: "Summit",
     needMoonsBoss: "Opens with {n} moon shards",
     challenge: "Challenge",

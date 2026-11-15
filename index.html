@@ -160,6 +160,10 @@ html, body { margin: 0; height: 100%; overflow: hidden; background: #1a1020; fon
 .mlist .mrow { opacity: .55; }
 .mlist .mrow.got { opacity: 1; }
 #moons small { font-size: 13px; opacity: .8; margin-left: 2px; }
+
+#saved { position: fixed; right: 16px; bottom: 16px; padding: 6px 12px; border-radius: 12px; background: rgba(40,20,50,.7); color: #fff1d6; font-weight: 900; font-size: 14px; opacity: 0; pointer-events: none; }
+#saved.show { animation: savedFade 2s ease; }
+@keyframes savedFade { 0% { opacity: 0; } 15% { opacity: 1; } 75% { opacity: 1; } 100% { opacity: 0; } }
 </style>
 </head>
 <body>

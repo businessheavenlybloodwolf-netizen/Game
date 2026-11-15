@@ -55,6 +55,12 @@ export class HUD {
     this.el.moons.style.display = '';
     this.el.moons.innerHTML = `<span class="moon full"></span> ${n}<small>/${total}</small>`;
   }
+  saved(text) {
+    let el = document.getElementById('saved');
+    if (!el) { el = document.createElement('div'); el.id = 'saved'; document.body.appendChild(el); }
+    el.textContent = '💾 ' + text;
+    el.classList.remove('show'); void el.offsetWidth; el.classList.add('show');
+  }
   prompt(text) {
     if (text === this.curPrompt) return;
     this.curPrompt = text;

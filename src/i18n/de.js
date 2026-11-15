@@ -1,6 +1,7 @@
 export default {
   name: 'Deutsch',
   ui: {
+    saved: 'Gespeichert',
     peak: "Gipfel",
     needMoonsBoss: "Öffnet sich mit {n} Mondsplittern",
     challenge: "Herausforderung",

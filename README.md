@@ -104,7 +104,7 @@ der echten Spielphysik nach (`__lumi.debugTestLevel(welt, level)` in der Browser
 
 Auf Handy und Tablet erscheinen Touch-Steuerelemente (Stick links, Knöpfe rechts, Kamera durch Wischen).
 
-Fortschritt wird im Browser gespeichert (`localStorage`). Zum Testen: `lumi.html?w=4` startet direkt im Reich 5, `lumi.html?w=4&l=0` in dessen erster Herausforderung.
+**Speichern:** automatisch, ohne Speicherpunkte. Das Spiel speichert bei jedem Mondsplitter, Schlüssel, Boss, jeder Reise, alle 15 Sekunden und beim Schließen oder Minimieren des Fensters. Eine kleine Anzeige „💾 Gespeichert“ bestätigt das. Gespeichert wird im Browser (`localStorage`) bzw. im Profil der Desktop-App. „Fortsetzen“ im Titelmenü führt zurück ins zuletzt besuchte Reich. Zum Testen: `lumi.html?w=4` startet direkt im Reich 5, `lumi.html?w=4&l=0` in dessen erster Herausforderung.
 
 ## Entwickeln
 

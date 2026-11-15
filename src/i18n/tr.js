@@ -1,6 +1,7 @@
 export default {
   name: 'Türkçe',
   ui: {
+    saved: 'Kaydedildi',
     peak: "Zirve",
     needMoonsBoss: "{n} ay parçasıyla açılır",
     challenge: "Görev",

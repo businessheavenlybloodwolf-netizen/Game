@@ -1,6 +1,7 @@
 export default {
   name: 'Français',
   ui: {
+    saved: 'Sauvegardé',
     peak: "Sommet",
     needMoonsBoss: "S'ouvre avec {n} éclats de lune",
     challenge: "Défi",
