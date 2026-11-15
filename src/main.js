@@ -1,7 +1,7 @@
 // LUMI und das Morgenlicht – Hauptspiel (offene Reiche + Herausforderungen)
 import * as THREE from 'three';
 import { createTextures, setTextureQuality, setAnisotropy } from './textures.js';
-import { setTextures } from './models.js';
+import { setTextures, setBatching } from './models.js';
 import { GameAudio } from './audio.js';
 import { Input } from './input.js';
 import { Particles } from './particles.js';
@@ -41,6 +41,7 @@ class Game {
     const preset = loadPreset();
     setTextureQuality(PRESETS[preset].tex);
     setAnisotropy(PRESETS[preset].aniso);
+    setBatching(PRESETS[preset].batch);
     const canvas = document.getElementById('game');
     this.canvas = canvas;
     const renderer = this.renderer = new THREE.WebGLRenderer({ canvas, antialias: true, powerPreference: 'high-performance' });
@@ -200,7 +201,7 @@ class Game {
 
   cycleGraphics(back) {
     const next = ORDER[(ORDER.indexOf(this.gfx.name) + 1) % ORDER.length];
-    const texChange = PRESETS[next].tex !== PRESETS[this.gfx.name].tex;
+    const texChange = PRESETS[next].tex !== PRESETS[this.gfx.name].tex || PRESETS[next].batch !== PRESETS[this.gfx.name].batch;
     savePreset(next);
     if (texChange) { this.writeSave(); location.reload(); return; }
     this.gfx.apply(next);

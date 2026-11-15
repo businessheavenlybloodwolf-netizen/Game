@@ -104,7 +104,10 @@ export class Level {
 
   // Unbewegliche Teile pro Material zu wenigen großen Meshes verschmelzen (spart tausende Draw Calls).
   // Verschmolzen wird nur innerhalb von 60-m-Kacheln, damit Sicht- und Schatten-Culling weiter greifen.
+  get batch() { return !this.game.gfx || this.game.gfx.p.batch; }
+
   bakeStatic() {
+    if (!this.batch) return; // PC: alles bleibt einzeln
     this.group.updateMatrixWorld(true);
     const CELL = 60;
     const sig = (g) => Object.keys(g.attributes).sort().join(',') + (g.index ? '|i' : '|n');
@@ -540,6 +543,11 @@ export class Level {
 
   buildSparkInstances() {
     if (!this.sparks.length) return;
+    if (!this.batch) {
+      // PC: jeder Funke ist ein eigenes Objekt
+      for (const sp of this.sparks) { sp.mesh = M.createSpark(); sp.mesh.position.copy(sp.pos); this.add(sp.mesh); }
+      return;
+    }
     const proto = M.createSpark();
     const im = new THREE.InstancedMesh(proto.geometry, proto.material, this.sparks.length);
     im.frustumCulled = false;
@@ -549,6 +557,10 @@ export class Level {
   }
 
   updateSparkInstances(t) {
+    if (!this.batch) {
+      for (const sp of this.sparks) if (sp.mesh) { sp.mesh.visible = !sp.taken; sp.mesh.position.copy(sp.pos); sp.mesh.rotation.y = t * 2.5 + sp.ph; }
+      return;
+    }
     const im = this.sparkMesh; if (!im) return;
     const m4 = new THREE.Matrix4(), q = new THREE.Quaternion(), sc = new THREE.Vector3(), up = new THREE.Vector3(0, 1, 0);
     this.sparks.forEach((s, i) => {
@@ -699,10 +711,11 @@ export class Level {
 
   distantIsland(x, y, z, r, o = {}) {
     const s = this.surf(o.mat || 'grass');
+    const g = new THREE.Group(); g.position.set(x, y, z); this.add(g);
     const top = new THREE.Mesh(new THREE.CylinderGeometry(r, r * 0.95, r * 0.35, 14), [s.side, s.top, s.side]);
-    top.position.set(x, y, z); this.add(top); this.staticRoots.push(top);
+    g.add(top);
     const under = new THREE.Mesh(new THREE.ConeGeometry(r * 0.93, r * 1.8, 12), s.side);
-    under.rotation.x = Math.PI; under.position.set(x, y - r * 0.175 - r * 0.9, z); this.add(under); this.staticRoots.push(under);
+    under.rotation.x = Math.PI; under.position.y = -r * 0.175 - r * 0.9; g.add(under);
     const n = o.trees ?? Math.round(r / 2);
     for (let i = 0; i < n; i++) {
       const a = this.rand() * 6.28, rr = this.rand() * r * 0.7;
@@ -714,10 +727,17 @@ export class Level {
       else if (kind === 'coral') t = M.createCoralPlant(this.rand);
       else if (kind === 'none') continue;
       else t = M.createTree(this.rand, this.rand() < 0.3 ? 'blossom' : kind);
-      t.position.set(x + Math.cos(a) * rr, y + r * 0.175, z + Math.sin(a) * rr);
+      t.position.set(Math.cos(a) * rr, r * 0.175, Math.sin(a) * rr);
       t.scale.setScalar(r / 5 + 0.5);
-      t.traverse((o) => { o.castShadow = false; });
-      this.add(t); this.staticRoots.push(t);
+      g.add(t);
+    }
+    if (this.batch) {
+      // Handy: unbeweglich, ohne Schatten, wird beim Laden verschmolzen
+      g.traverse((ob) => { ob.castShadow = false; });
+      this.staticRoots.push(g);
+    } else {
+      // PC: Inseln schweben sanft und werfen Schatten
+      this.anim.push({ kind: 'bobGroup', obj: g, base: y, amp: 0.4, sp: 0.3 + this.rand() * 0.3, ph: this.rand() * 6 });
     }
   }
 
@@ -1033,7 +1053,8 @@ export class Level {
       this.goal.mesh.userData.ring.scale.setScalar(1 + Math.sin(t * 3) * 0.1);
     }
     for (const a of this.anim) {
-      if (a.kind === 'bob') { const dy = Math.sin(t * a.sp + a.ph) * a.amp; a.obj.position.y = a.base + dy; a.other.position.y = a.obase + dy; }
+      if (a.kind === 'bobGroup') a.obj.position.y = a.base + Math.sin(t * a.sp + a.ph) * a.amp;
+      else if (a.kind === 'bob') { const dy = Math.sin(t * a.sp + a.ph) * a.amp; a.obj.position.y = a.base + dy; a.other.position.y = a.obase + dy; }
       else if (a.kind === 'drift') { a.obj.position.x += a.sp * dt; if (a.obj.position.x > a.x1) a.obj.position.x = a.x0; }
       else if (a.kind === 'spin') a.obj.rotation.z += a.sp * dt;
       else if (a.kind === 'npc') { const b = a.obj.userData.body; b.position.y = Math.abs(Math.sin(t * 3 + a.ph)) * 0.08; b.rotation.z = Math.sin(t * 1.5 + a.ph) * 0.08; }

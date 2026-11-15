@@ -25,7 +25,11 @@ export function basic(color, opts = {}) {
 const outlineMat = new THREE.MeshBasicMaterial({ color: 0x1a1020, side: THREE.BackSide });
 
 // Verschmilzt alle Meshes einer Gruppe (ohne die in "skip") pro Material zu je einem Mesh – weniger Draw Calls
+let BATCH = true;
+export function setBatching(b) { BATCH = b; }
+
 export function compactGroup(group, skip = []) {
+  if (!BATCH) return group;
   group.updateMatrixWorld(true);
   const inv = group.matrixWorld.clone().invert();
   const skipSet = new Set();
@@ -504,6 +508,11 @@ export function createCloud(rand, color = 0xffffff, opacity = 0.95) {
     g.scale(1, 0.7, 1);
     g.translate((i - n / 2) * 1.4 + rand(), rand() * 0.8, (rand() - 0.5) * 1.5);
     geos.push(g);
+  }
+  if (!BATCH) {
+    const root = new THREE.Group();
+    for (const g of geos) { const sm = new THREE.Mesh(g, m); sm.castShadow = false; root.add(sm); }
+    return root;
   }
   const merged = mergeGeometries(geos, false);
   const root = new THREE.Mesh(merged, m);

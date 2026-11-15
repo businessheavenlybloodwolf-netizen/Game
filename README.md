@@ -80,8 +80,9 @@ Die Grafikstufe lässt sich im Haupt- und Pausenmenü umschalten.
 | Hoch (Standard auf dem PC) | bis 2× | Bloom-Leuchten |
 | Ultra | **bis 3840×2160 (4K)**, auf kleineren Bildschirmen als Supersampling | 4096er-Schatten, doppelt so scharfe Texturen, mehr Deko, weitere Sicht |
 
-Unbewegliche Teile werden beim Laden zu großen Meshes verschmolzen (Static Batching in 60-m-Kacheln), dazu Instancing für die Funken.
-Das senkt die Draw Calls in einem Reich auf rund ein Viertel.
+**Sparmodus nur auf dem Handy (Niedrig/Mittel):** Unbewegliche Teile werden beim Laden zu großen Meshes verschmolzen (Static Batching in 60-m-Kacheln),
+Funken per Instancing gezeichnet und Hintergrund-Inseln eingefroren. Das senkt die Draw Calls in einem Reich auf etwa ein Drittel.
+**Auf dem PC (Hoch/Ultra)** bleibt alles einzeln: schwebende Hintergrund-Inseln mit Schatten, einzelne Funken, Wolken und Figurenteile.
 
 ## Qualitätssicherung
 

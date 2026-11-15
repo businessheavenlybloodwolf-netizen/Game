@@ -1,4 +1,5 @@
 // Grafikqualität: Niedrig / Mittel (Handy-Standard) / Hoch / Ultra (bis 4K)
+// batch = Draw-Call-Sparmodus (Verschmelzen/Instancing) – nur auf Handy-Stufen, der PC zeichnet alles einzeln
 import * as THREE from 'three';
 import { EffectComposer } from 'three/examples/jsm/postprocessing/EffectComposer.js';
 import { RenderPass } from 'three/examples/jsm/postprocessing/RenderPass.js';
@@ -6,10 +7,10 @@ import { UnrealBloomPass } from 'three/examples/jsm/postprocessing/UnrealBloomPa
 import { OutputPass } from 'three/examples/jsm/postprocessing/OutputPass.js';
 
 export const PRESETS = {
-  low: { maxPR: 1, shadow: 1024, soft: false, bloom: false, tex: 1, aniso: 2, fog: 1, shadowRange: 24 },
-  medium: { maxPR: 1.5, shadow: 2048, soft: true, bloom: false, tex: 1, aniso: 4, fog: 1, shadowRange: 28 },
-  high: { maxPR: 2, shadow: 2048, soft: true, bloom: true, tex: 1, aniso: 8, fog: 1.15, shadowRange: 32 },
-  ultra: { maxPR: '4k', shadow: 4096, soft: true, bloom: true, tex: 2, aniso: 16, fog: 1.35, shadowRange: 40 },
+  low: { batch: true, maxPR: 1, shadow: 1024, soft: false, bloom: false, tex: 1, aniso: 2, fog: 1, shadowRange: 24 },
+  medium: { batch: true, maxPR: 1.5, shadow: 2048, soft: true, bloom: false, tex: 1, aniso: 4, fog: 1, shadowRange: 28 },
+  high: { batch: false, maxPR: 2, shadow: 2048, soft: true, bloom: true, tex: 1, aniso: 8, fog: 1.15, shadowRange: 32 },
+  ultra: { batch: false, maxPR: '4k', shadow: 4096, soft: true, bloom: true, tex: 2, aniso: 16, fog: 1.35, shadowRange: 40 },
 };
 export const ORDER = ['low', 'medium', 'high', 'ultra'];
 const KEY = 'lumi_gfx';
