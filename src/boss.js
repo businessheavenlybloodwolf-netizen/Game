@@ -55,8 +55,7 @@ export class Boss {
     if (this.flash > 0) { this.flash -= dt; u.mat.emissive.set(Math.floor(this.flash * 20) % 2 ? 0xff4060 : be); }
     else u.mat.emissive.set(be);
     // Pupillen folgen dem Spieler
-    const toP = new THREE.Vector3(player.pos.x - this.pos.x, 0, player.pos.z - this.pos.z);
-    if (this.state !== 'dead' && this.state !== 'promo') this.mesh.rotation.y += (Math.atan2(toP.x, toP.z) - this.mesh.rotation.y) * Math.min(1, dt * 3);
+    if (this.state !== 'dead' && this.state !== 'promo') this.mesh.rotation.y += (Math.atan2(player.pos.x - this.pos.x, player.pos.z - this.pos.z) - this.mesh.rotation.y) * Math.min(1, dt * 3);
 
     const c = this.center;
     switch (this.state) {

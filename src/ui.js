@@ -47,6 +47,9 @@ export class HUD {
   setTimer(t) {
     this.el.timer.style.display = t == null ? 'none' : '';
     if (t == null) return;
+    const sec = Math.floor(t);
+    if (sec === this.lastSec) return;
+    this.lastSec = sec;
     const m = Math.floor(t / 60), s = Math.floor(t % 60);
     this.el.timer.textContent = `${m}:${String(s).padStart(2, '0')}`;
   }

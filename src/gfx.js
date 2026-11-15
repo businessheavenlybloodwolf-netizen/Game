@@ -7,10 +7,10 @@ import { UnrealBloomPass } from 'three/examples/jsm/postprocessing/UnrealBloomPa
 import { OutputPass } from 'three/examples/jsm/postprocessing/OutputPass.js';
 
 export const PRESETS = {
-  low: { batch: true, maxPR: 1, shadow: 1024, soft: false, bloom: false, tex: 1, aniso: 2, fog: 1, shadowRange: 24 },
-  medium: { batch: true, maxPR: 1.5, shadow: 2048, soft: true, bloom: false, tex: 1, aniso: 4, fog: 1, shadowRange: 28 },
-  high: { batch: false, maxPR: 1.5, shadow: 2048, soft: true, bloom: true, tex: 1, aniso: 8, fog: 1.15, shadowRange: 32 },
-  ultra: { batch: false, maxPR: '4k', shadow: 4096, soft: true, bloom: true, tex: 2, aniso: 16, fog: 1.35, shadowRange: 40 },
+  low: { batch: true, light: false, aa: false, fx: 0.25, maxPR: 1, shadow: 512, soft: false, bloom: false, tex: 1, aniso: 2, fog: 1, shadowRange: 24 },
+  medium: { batch: true, light: false, aa: false, fx: 0.4, maxPR: 1.5, shadow: 1024, soft: false, bloom: false, tex: 1, aniso: 4, fog: 1, shadowRange: 22 },
+  high: { batch: false, light: true, aa: true, fx: 1, maxPR: 1.5, shadow: 2048, soft: true, bloom: true, tex: 1, aniso: 8, fog: 1.15, shadowRange: 32 },
+  ultra: { batch: false, light: true, aa: true, fx: 1, maxPR: '4k', shadow: 4096, soft: true, bloom: true, tex: 2, aniso: 16, fog: 1.35, shadowRange: 40 },
 };
 export const ORDER = ['low', 'medium', 'high', 'ultra'];
 const KEY = 'lumi_gfx';

@@ -46,7 +46,7 @@ class Game {
     setBatching(true);
     const canvas = document.getElementById('game');
     this.canvas = canvas;
-    const renderer = this.renderer = new THREE.WebGLRenderer({ canvas, antialias: true, powerPreference: 'high-performance' });
+    const renderer = this.renderer = new THREE.WebGLRenderer({ canvas, antialias: PRESETS[preset].aa !== false, powerPreference: 'high-performance' });
     renderer.shadowMap.enabled = true;
     this.scene = new THREE.Scene();
     this.camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.1, 2500);
@@ -58,6 +58,10 @@ class Game {
     this.particles = new Particles(this.scene, this.T);
     this.player = new Player(this);
     this.player.attach(this.scene);
+    // Handy: Lumis Punktlicht kostet auf jeder Oberfläche Rechenzeit – dort weglassen (Flamme leuchtet trotzdem)
+    if (PRESETS[preset].light === false) this.player.mesh.userData.light.visible = false;
+    this.particles.rate = PRESETS[preset].fx ?? 1;
+    this._tgt = new THREE.Vector3(); this._dir = new THREE.Vector3();
     this.raycaster = new THREE.Raycaster();
     this.camYaw = 0; this.camPitch = 0.3; this.camDist = 9.5;
     this.camTarget = new THREE.Vector3();
@@ -933,6 +937,7 @@ class Game {
     this.updateCamera(dt);
     L.updateSun(this.camTarget);
     this.hud.update(dt);
+    this.particles.setView(this.camera, this.renderer);
     this.gfx.render();
     this.gfx.adapt(dt);
     if (this.showFps && this.gfx.win.n === 0) {
@@ -994,7 +999,7 @@ class Game {
     if (this.state === 'clear') this.camYaw += dt * 0.5;
     // Ziel folgt dem Spieler (vertikal etwas träger)
     const bossCam = this.level.boss && this.level.boss.active;
-    const tgt = new THREE.Vector3(p.x, p.y + (bossCam ? 2.8 : 1.3), p.z);
+    const tgt = this._tgt.set(p.x, p.y + (bossCam ? 2.8 : 1.3), p.z);
     const kh = 1 - Math.exp(-dt * 10), kv = 1 - Math.exp(-dt * (this.player.grounded ? 6 : 3));
     this.camTarget.x += (tgt.x - this.camTarget.x) * kh;
     this.camTarget.z += (tgt.z - this.camTarget.z) * kh;
@@ -1003,7 +1008,7 @@ class Game {
     const dist = this.state === 'clear' ? 7 : bossCam ? 14 : this.camDist;
     if (bossCam && this.camManualT <= 0) this.camPitch += (0.22 - this.camPitch) * Math.min(1, dt * 1.5);
     const cp = Math.cos(this.camPitch), sp = Math.sin(this.camPitch);
-    const dir = new THREE.Vector3(Math.sin(this.camYaw) * cp, sp, Math.cos(this.camYaw) * cp);
+    const dir = this._dir.set(Math.sin(this.camYaw) * cp, sp, Math.cos(this.camYaw) * cp);
     let d = dist;
     this.raycaster.set(this.camTarget, dir);
     this.raycaster.far = dist;

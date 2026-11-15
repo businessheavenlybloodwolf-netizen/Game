@@ -55,6 +55,9 @@ function getStreakTex() {
   return streakTex;
 }
 
+// wiederverwendete Hilfsobjekte (keine Speicher-Erzeugung pro Physikschritt → keine Ruckler durch Speicherbereinigung)
+const _pc = new THREE.Vector3(), _wp = new THREE.Vector3(), _m4 = new THREE.Matrix4(), _q = new THREE.Quaternion(), _sc = new THREE.Vector3(), _up = new THREE.Vector3(0, 1, 0);
+
 const SKY_VS = `varying vec3 vDir; void main(){ vDir = normalize(position); vec4 p = projectionMatrix * modelViewMatrix * vec4(position,1.0); gl_Position = p.xyww; }`;
 const SKY_FS = `uniform vec3 top; uniform vec3 horizon; uniform vec3 bottom; uniform vec3 sunDir; uniform vec3 sunCol; uniform float stars; uniform float linOut; varying vec3 vDir;
 float hash(vec3 p){ p = fract(p*0.3183099+.1); p*=17.0; return fract(p.x*p.y*p.z*(p.x+p.y+p.z)); }
@@ -567,7 +570,7 @@ export class Level {
       return;
     }
     const im = this.sparkMesh; if (!im) return;
-    const m4 = new THREE.Matrix4(), q = new THREE.Quaternion(), sc = new THREE.Vector3(), up = new THREE.Vector3(0, 1, 0);
+    const m4 = _m4, q = _q, sc = _sc, up = _up;
     this.sparks.forEach((s, i) => {
       q.setFromAxisAngle(up, t * 2.5 + s.ph);
       sc.setScalar(s.taken ? 0 : 1);
@@ -846,7 +849,7 @@ export class Level {
   interact(dt, player) {
     const g = this.game;
     const p = player.pos;
-    const pc = new THREE.Vector3(p.x, p.y + 0.6, p.z);
+    const pc = _pc.set(p.x, p.y + 0.6, p.z);
     // Crumble-Auslöser
     for (const cr of this.crumbles) if (cr.state === 'idle' && player.grounded && player.ground === cr.col) { cr.state = 'shaking'; cr.t = 0; }
     // Funken
@@ -884,7 +887,7 @@ export class Level {
       }
     }
     // Kristallrotoren
-    const wp = new THREE.Vector3();
+    const wp = _wp;
     for (const fb of this.firebars) {
       for (const b of fb.balls) {
         b.getWorldPosition(wp);
@@ -1016,10 +1019,11 @@ export class Level {
       u.lamp.rotation.z = Math.sin(t * 2 + cp.x) * 0.1;
     }
     for (const fb of this.firebars) fb.piv.rotation.y = t * fb.speed;
-    for (const u of this.updrafts) { u.tex.offset.y -= dt * 1.5; if (Math.random() < dt * 8) this.game.particles.burst(new THREE.Vector3(u.x + (Math.random() - 0.5) * u.r * 1.5, u.y0 + 0.5, u.z + (Math.random() - 0.5) * u.r * 1.5), { count: 1, color: 0xffffff, speed: 0.1, gravity: 14, life: 1.8, size: 0.35, drag: 0 }); }
+    for (const u of this.updrafts) { u.tex.offset.y -= dt * 1.5; if (Math.random() < dt * 8 * (this.game.particles.rate ?? 1)) this.game.particles.burst(new THREE.Vector3(u.x + (Math.random() - 0.5) * u.r * 1.5, u.y0 + 0.5, u.z + (Math.random() - 0.5) * u.r * 1.5), { count: 1, color: 0xffffff, speed: 0.1, gravity: 14, life: 1.8, size: 0.35, drag: 0 }); }
     if (this.seaTex) { const k = this.lavaFlow ? 3 : 1; this.seaTex.offset.x += dt * 0.004 * k; this.seaTex.offset.y += dt * 0.002 * k; }
     const th = this.def.theme;
-    if ((th.snow || th.bubbles) && Math.random() < dt * 25) {
+    const fxRate = this.game.particles.rate ?? 1;
+    if ((th.snow || th.bubbles) && Math.random() < dt * 25 * fxRate) {
       const p = player.pos;
       const pos = new THREE.Vector3(p.x + (Math.random() - 0.5) * 30, p.y + (th.snow ? 12 : -6), p.z + (Math.random() - 0.5) * 30);
       this.game.particles.burst(pos, th.snow
@@ -1050,7 +1054,7 @@ export class Level {
       const tgt = d < 6 ? 0.85 : 0.0;
       gh.vis += (tgt - gh.vis) * Math.min(1, dt * 3);
       gh.mat.opacity = Math.max(gh.vis, 0.03 + Math.sin(t * 2 + gh.x) * 0.02);
-      if (Math.random() < dt * 0.6) this.game.particles.burst(new THREE.Vector3(gh.x + (Math.random() - 0.5) * gh.col.r, gh.y + 0.3, gh.z), { count: 1, color: 0xbfd0ff, speed: 0.3, size: 0.3, tex: 'sparkle', additive: true, gravity: 0.5, life: 1.2 });
+      if (Math.random() < dt * 0.6 * fxRate) this.game.particles.burst(new THREE.Vector3(gh.x + (Math.random() - 0.5) * gh.col.r, gh.y + 0.3, gh.z), { count: 1, color: 0xbfd0ff, speed: 0.3, size: 0.3, tex: 'sparkle', additive: true, gravity: 0.5, life: 1.2 });
     }
     if (this.goal && !this.goal.taken) {
       this.goal.mesh.rotation.y = t * 1.2;

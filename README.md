@@ -76,7 +76,7 @@ Die Grafikstufe lässt sich im Haupt- und Pausenmenü umschalten.
 | Stufe | Auflösung | Extras |
 |---|---|---|
 | Niedrig | 1× | weniger Deko, 1024er-Schatten |
-| Mittel (Standard auf Handys) | bis 1,5× | wie bisher |
+| Mittel (Standard auf Handys) | bis 1,5× | 1024er-Schatten, ohne Kantenglättung und Punktlicht |
 | Hoch (Standard auf dem PC) | bis 1,5× | Bloom-Leuchten |
 | Ultra | **bis 3840×2160 (4K)**, auf kleineren Bildschirmen als Supersampling | 4096er-Schatten, doppelt so scharfe Texturen, mehr Deko, weitere Sicht |
 
@@ -85,6 +85,9 @@ Funken per Instancing gezeichnet und Figuren intern zusammengefasst. Das Bild bl
 330 statt über 1000 Draw Calls. Auf dem PC schweben die Hintergrund-Inseln weiter und werfen Schatten, auf dem Handy sind sie eingefroren.
 Dazu kommt eine **dynamische Auflösung**: Fällt die Bildrate unter etwa 50 FPS, sinkt die Renderauflösung schrittweise (bis 55 %) und steigt bei
 Luft wieder an. **F3** (oder das Menü) blendet eine FPS-Anzeige mit aktueller Auflösung ein.
+Alle Partikel (Schnee, Blasen, Funkeln, Staub) werden gebündelt als Punktwolken gezeichnet – wenige Draw Calls statt einem pro Partikel.
+In heißen Schleifen wird kein Speicher mehr pro Bild erzeugt (verhindert Ruckler durch Speicherbereinigung).
+**Handy-Stufen** verzichten zusätzlich auf Kantenglättung und Lumis Punktlicht, nutzen 1024er-Schatten ohne Weichzeichnung und weniger Umgebungspartikel.
 
 ## Qualitätssicherung
 
