@@ -107,7 +107,6 @@ export class Level {
   get batch() { return !this.game.gfx || this.game.gfx.p.batch; }
 
   bakeStatic() {
-    if (!this.batch) return; // PC: alles bleibt einzeln
     this.group.updateMatrixWorld(true);
     const CELL = 60;
     const sig = (g) => Object.keys(g.attributes).sort().join(',') + (g.index ? '|i' : '|n');
@@ -162,8 +161,15 @@ export class Level {
       this.group.add(m);
       merged += list.length;
     }
-    // Originale bleiben für die Kamera-Kollision im Szenengraph, werden aber nicht mehr gezeichnet
-    for (const p of ok) p.obj.visible = false;
+    // Originale aus der Szene entfernen (spart Matrix-Updates jedes Bild). Ihre letzte Weltmatrix bleibt
+    // für die Kamera-Kollision (Raycast auf cameraMeshes) erhalten.
+    for (const p of ok) { p.obj.visible = false; if (p.obj.parent) p.obj.parent.remove(p.obj); }
+    for (const root of this.staticRoots) {
+      let hasMesh = false; root.traverse((o) => { if (o.isMesh || o.isSprite) hasMesh = true; });
+      if (!hasMesh && root.parent) root.parent.remove(root);
+    }
+    // verschmolzene Meshes bewegen sich nie
+    for (const ch of this.group.children) if (ch.userData.baked) { ch.updateMatrix(); ch.matrixAutoUpdate = false; }
     this.bakedCount = merged;
   }
 
@@ -543,8 +549,7 @@ export class Level {
 
   buildSparkInstances() {
     if (!this.sparks.length) return;
-    if (!this.batch) {
-      // PC: jeder Funke ist ein eigenes Objekt
+    if (false) {
       for (const sp of this.sparks) { sp.mesh = M.createSpark(); sp.mesh.position.copy(sp.pos); this.add(sp.mesh); }
       return;
     }
@@ -557,7 +562,7 @@ export class Level {
   }
 
   updateSparkInstances(t) {
-    if (!this.batch) {
+    if (false) {
       for (const sp of this.sparks) if (sp.mesh) { sp.mesh.visible = !sp.taken; sp.mesh.position.copy(sp.pos); sp.mesh.rotation.y = t * 2.5 + sp.ph; }
       return;
     }
@@ -736,7 +741,8 @@ export class Level {
       g.traverse((ob) => { ob.castShadow = false; });
       this.staticRoots.push(g);
     } else {
-      // PC: Inseln schweben sanft und werfen Schatten
+      // PC: Inseln schweben sanft und werfen Schatten – pro Insel zu wenigen Meshes verschmolzen
+      M.compactGroup(g);
       this.anim.push({ kind: 'bobGroup', obj: g, base: y, amp: 0.4, sp: 0.3 + this.rand() * 0.3, ph: this.rand() * 6 });
     }
   }

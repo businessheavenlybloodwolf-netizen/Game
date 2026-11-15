@@ -1,6 +1,7 @@
 export default {
   name: 'English',
   ui: {
+    fpsShow: "FPS counter",
     slots: "Save slots",
     slot: "Slot {n}",
     slotEmpty: "Empty – new adventure",

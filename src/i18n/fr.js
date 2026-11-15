@@ -1,6 +1,7 @@
 export default {
   name: 'Français',
   ui: {
+    fpsShow: "Afficher les FPS",
     slots: "Sauvegardes",
     slot: "Sauvegarde {n}",
     slotEmpty: "Vide – nouvelle aventure",

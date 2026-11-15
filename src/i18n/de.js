@@ -1,6 +1,7 @@
 export default {
   name: 'Deutsch',
   ui: {
+    fpsShow: "FPS-Anzeige",
     slots: "Spielstände",
     slot: "Spielstand {n}",
     slotEmpty: "Leer – neues Abenteuer",

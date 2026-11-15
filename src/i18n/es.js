@@ -1,6 +1,7 @@
 export default {
   name: 'Español',
   ui: {
+    fpsShow: "Mostrar FPS",
     slots: "Partidas",
     slot: "Partida {n}",
     slotEmpty: "Vacía – nueva aventura",

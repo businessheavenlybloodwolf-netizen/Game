@@ -43,7 +43,7 @@ class Game {
     const preset = loadPreset();
     setTextureQuality(PRESETS[preset].tex);
     setAnisotropy(PRESETS[preset].aniso);
-    setBatching(PRESETS[preset].batch);
+    setBatching(true);
     const canvas = document.getElementById('game');
     this.canvas = canvas;
     const renderer = this.renderer = new THREE.WebGLRenderer({ canvas, antialias: true, powerPreference: 'high-performance' });
@@ -72,6 +72,11 @@ class Game {
     this.lighthouseLit = false;
     this.state = 'title';
     this.applyLangToDom();
+    // FPS-Anzeige (F3 oder Menü)
+    const fpsEl = document.createElement('div'); fpsEl.id = 'fps'; document.body.appendChild(fpsEl);
+    try { this.showFps = localStorage.getItem('lumi_fps') === '1'; } catch (e) { this.showFps = false; }
+    fpsEl.style.display = this.showFps ? 'block' : 'none';
+    window.addEventListener('keydown', (e) => { if (e.code === 'F3') { e.preventDefault(); this.toggleFps(); } });
 
     window.addEventListener('resize', () => {
       this.camera.aspect = window.innerWidth / window.innerHeight;
@@ -226,8 +231,15 @@ class Game {
       { label: t('ui.controls'), action: () => this.showControls(back) },
       { label: `${t('ui.sound')}: ${this.audio.muted ? t('ui.off') : t('ui.on')}`, action: () => { this.audio.toggleMute(); back(); } },
       { label: t('ui.fullscreen'), action: () => { this.toggleFullscreen(); } },
+      { label: `${t('ui.fpsShow')}: ${this.showFps ? t('ui.on') : t('ui.off')}`, action: () => { this.toggleFps(); back(); } },
       { label: '💾 ' + t('ui.saveMenu'), action: () => this.saveMenu(back) },
     ];
+  }
+
+  toggleFps() {
+    this.showFps = !this.showFps;
+    try { localStorage.setItem('lumi_fps', this.showFps ? '1' : '0'); } catch (e) { /* egal */ }
+    document.getElementById('fps').style.display = this.showFps ? 'block' : 'none';
   }
 
   // ---------------- Speicherstand als Datei ----------------
@@ -306,6 +318,7 @@ class Game {
   cycleGraphics(back) {
     const next = ORDER[(ORDER.indexOf(this.gfx.name) + 1) % ORDER.length];
     const texChange = PRESETS[next].tex !== PRESETS[this.gfx.name].tex || PRESETS[next].batch !== PRESETS[this.gfx.name].batch;
+    this.gfx.scale = 1;
     savePreset(next);
     if (texChange) { this.writeSave(); location.reload(); return; }
     this.gfx.apply(next);
@@ -921,6 +934,11 @@ class Game {
     L.updateSun(this.camTarget);
     this.hud.update(dt);
     this.gfx.render();
+    this.gfx.adapt(dt);
+    if (this.showFps && this.gfx.win.n === 0) {
+      const r = this.renderer;
+      document.getElementById('fps').textContent = `${this.gfx.fps} FPS · ${Math.round(this.gfx.scale * 100)}% · ${r.domElement.width}×${r.domElement.height}`;
+    }
     input.endFrame();
   }
 

@@ -77,12 +77,14 @@ Die Grafikstufe lässt sich im Haupt- und Pausenmenü umschalten.
 |---|---|---|
 | Niedrig | 1× | weniger Deko, 1024er-Schatten |
 | Mittel (Standard auf Handys) | bis 1,5× | wie bisher |
-| Hoch (Standard auf dem PC) | bis 2× | Bloom-Leuchten |
+| Hoch (Standard auf dem PC) | bis 1,5× | Bloom-Leuchten |
 | Ultra | **bis 3840×2160 (4K)**, auf kleineren Bildschirmen als Supersampling | 4096er-Schatten, doppelt so scharfe Texturen, mehr Deko, weitere Sicht |
 
-**Sparmodus nur auf dem Handy (Niedrig/Mittel):** Unbewegliche Teile werden beim Laden zu großen Meshes verschmolzen (Static Batching in 60-m-Kacheln),
-Funken per Instancing gezeichnet und Hintergrund-Inseln eingefroren. Das senkt die Draw Calls in einem Reich auf etwa ein Drittel.
-**Auf dem PC (Hoch/Ultra)** bleibt alles einzeln: schwebende Hintergrund-Inseln mit Schatten, einzelne Funken, Wolken und Figurenteile.
+**Performance:** Unbewegliche Teile werden beim Laden pro Material zu großen Meshes verschmolzen (Static Batching in 60-m-Kacheln),
+Funken per Instancing gezeichnet und Figuren intern zusammengefasst. Das Bild bleibt dabei identisch, aber ein Reich braucht nur noch rund
+330 statt über 1000 Draw Calls. Auf dem PC schweben die Hintergrund-Inseln weiter und werfen Schatten, auf dem Handy sind sie eingefroren.
+Dazu kommt eine **dynamische Auflösung**: Fällt die Bildrate unter etwa 50 FPS, sinkt die Renderauflösung schrittweise (bis 55 %) und steigt bei
+Luft wieder an. **F3** (oder das Menü) blendet eine FPS-Anzeige mit aktueller Auflösung ein.
 
 ## Qualitätssicherung
 

@@ -1,6 +1,7 @@
 export default {
   name: 'Türkçe',
   ui: {
+    fpsShow: "FPS göstergesi",
     slots: "Kayıtlar",
     slot: "Kayıt {n}",
     slotEmpty: "Boş – yeni macera",

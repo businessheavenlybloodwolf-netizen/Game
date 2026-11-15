@@ -1,5 +1,5 @@
 // Grafikqualität: Niedrig / Mittel (Handy-Standard) / Hoch / Ultra (bis 4K)
-// batch = Draw-Call-Sparmodus (Verschmelzen/Instancing) – nur auf Handy-Stufen, der PC zeichnet alles einzeln
+// batch = Handy-Modus (eingefrorene Hintergrund-Inseln ohne Schatten). Verschmolzen wird auf allen Stufen – das Bild bleibt gleich.
 import * as THREE from 'three';
 import { EffectComposer } from 'three/examples/jsm/postprocessing/EffectComposer.js';
 import { RenderPass } from 'three/examples/jsm/postprocessing/RenderPass.js';
@@ -9,7 +9,7 @@ import { OutputPass } from 'three/examples/jsm/postprocessing/OutputPass.js';
 export const PRESETS = {
   low: { batch: true, maxPR: 1, shadow: 1024, soft: false, bloom: false, tex: 1, aniso: 2, fog: 1, shadowRange: 24 },
   medium: { batch: true, maxPR: 1.5, shadow: 2048, soft: true, bloom: false, tex: 1, aniso: 4, fog: 1, shadowRange: 28 },
-  high: { batch: false, maxPR: 2, shadow: 2048, soft: true, bloom: true, tex: 1, aniso: 8, fog: 1.15, shadowRange: 32 },
+  high: { batch: false, maxPR: 1.5, shadow: 2048, soft: true, bloom: true, tex: 1, aniso: 8, fog: 1.15, shadowRange: 32 },
   ultra: { batch: false, maxPR: '4k', shadow: 4096, soft: true, bloom: true, tex: 2, aniso: 16, fog: 1.35, shadowRange: 40 },
 };
 export const ORDER = ['low', 'medium', 'high', 'ultra'];
@@ -26,7 +26,26 @@ export class Graphics {
     this.renderer = renderer; this.scene = scene; this.camera = camera;
     this.name = name; this.p = PRESETS[name];
     this.composer = null;
+    this.scale = 1;          // dynamische Auflösung (0.55 … 1)
+    this.win = { t: 0, n: 0, good: 0 };
+    this.fps = 0;
     this.apply(name);
+  }
+
+  // Dynamische Auflösung: fällt die Bildrate unter ~50 FPS, wird die Renderauflösung schrittweise gesenkt,
+  // bei viel Luft langsam wieder angehoben (mit Hysterese, damit nichts flackert).
+  adapt(dt) {
+    const w = this.win;
+    w.t += dt; w.n++;
+    if (w.t < 0.75) return;
+    const ms = (w.t / w.n) * 1000;
+    this.fps = Math.round(w.n / w.t);
+    w.t = 0; w.n = 0;
+    let next = this.scale;
+    if (ms > 21) { next = Math.max(0.55, this.scale - (ms > 33 ? 0.15 : 0.08)); w.good = 0; }
+    else if (ms < 17.8) { w.good++; if (w.good >= 4 && this.scale < 1) { next = Math.min(1, this.scale + 0.05); w.good = 0; } }
+    else w.good = 0;
+    if (Math.abs(next - this.scale) > 0.001) { this.scale = next; this.resize(); }
   }
 
   pixelRatio() {
@@ -57,7 +76,7 @@ export class Graphics {
 
   resize() {
     const w = window.innerWidth, h = window.innerHeight;
-    const pr = this.pixelRatio();
+    const pr = this.pixelRatio() * this.scale;
     this.renderer.setPixelRatio(pr);
     this.renderer.setSize(w, h);
     if (this.composer) { this.composer.setPixelRatio(pr); this.composer.setSize(w, h); }
