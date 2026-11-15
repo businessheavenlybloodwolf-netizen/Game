@@ -1,6 +1,17 @@
 export default {
   name: 'Italiano',
   ui: {
+    slots: "Salvataggi",
+    slot: "Salvataggio {n}",
+    slotEmpty: "Vuoto – nuova avventura",
+    chooseSlot: "Scegli uno slot",
+    play: "Gioca",
+    copyTo: "Copia in",
+    delete: "Elimina",
+    deleteConfirm: "Eliminare davvero il salvataggio {n}? Non si può annullare.",
+    overwriteSlot: "Il salvataggio {n} verrà sovrascritto.",
+    copied: "Copiato nel salvataggio {n}!",
+    deleted: "Salvataggio {n} eliminato.",
     saveMenu: "Salvataggio",
     saveInfo: "I progressi vengono salvati automaticamente. Qui puoi anche salvarli in un file o portarli su un altro dispositivo.",
     exportSave: "Esporta su file",

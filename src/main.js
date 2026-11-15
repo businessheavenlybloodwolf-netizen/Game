@@ -14,7 +14,9 @@ import { Graphics, PRESETS, ORDER, loadPreset, savePreset } from './gfx.js';
 import { t, setLang, detectLang, LANGS, getLang } from './i18n/index.js';
 
 const STEP = 1 / 120;
-const SAVE_KEY = 'lumi_save_v3';
+const SLOTS = 3;
+// Speicherplatz 1 nutzt den bisherigen Schlüssel, damit alte Spielstände erhalten bleiben
+const slotKey = (n) => (n === 1 ? 'lumi_save_v3' : `lumi_save_v3_s${n}`);
 // Mondsplitter pro Reich: 20 in der offenen Welt, je 4 in 5 Herausforderungen, 4 im Bonus-Tor, 3 (großer Splitter) beim Boss
 const OPEN_IDS = ['peak0', 'peak1', 'peak2', 'peak3', 'peak4', 'branch0', 'branch1', 'branch2', 'hid0', 'hid1', 'hid2',
   'pound0', 'pound1', 'crate0', 'crate1', 'pieces', 'lost', 'rings', 'shop', 'nest'];
@@ -62,6 +64,8 @@ class Game {
     this.camManualT = 0;
     this.shakeT = 0;
     this.acc = 0;
+    this.slot = 1;
+    try { this.slot = Math.min(SLOTS, Math.max(1, +localStorage.getItem('lumi_slot') || 1)); } catch (e) { /* egal */ }
     this.save = this.loadSave();
     this.hearts = 3; this.sparks = this.save.sparks || 0; this.lives = 0;
     this.levelGot = 0; this.levelTime = 0; this.timer = 0;
@@ -152,14 +156,27 @@ class Game {
   hasProgress() { return Object.values(this.save.moons).some((m) => Object.keys(m).length) || Object.keys(this.save.seen).length > 0; }
 
   // ---------------- Speicherstand ----------------
+  readSlot(n) {
+    try { return { ...this.emptySave(), ...(JSON.parse(localStorage.getItem(slotKey(n))) || {}) }; } catch (e) { return this.emptySave(); }
+  }
+  slotHasProgress(sv) { return Object.values(sv.moons || {}).some((m) => Object.keys(m || {}).length) || Object.keys(sv.seen || {}).length > 0; }
+  slotMoons(sv) { return Object.values(sv.moons || {}).reduce((n, m) => n + Object.values(m || {}).reduce((a, b) => a + b, 0), 0); }
+  useSlot(n) {
+    if (this.save && n !== this.slot) this.writeSave(false);
+    this.slot = n;
+    try { localStorage.setItem('lumi_slot', String(n)); } catch (e) { /* egal */ }
+    this.save = this.readSlot(n);
+    this.sparks = this.save.sparks || 0;
+  }
+
   emptySave() { return { moons: {}, levels: {}, keys: {}, bosses: {}, seen: {}, sparks: 0, kingdom: 0 }; }
   loadSave() {
-    try { return { ...this.emptySave(), ...(JSON.parse(localStorage.getItem(SAVE_KEY)) || {}) }; } catch (e) { return this.emptySave(); }
+    return this.readSlot(this.slot);
   }
   writeSave(show = true) {
     this.save.sparks = this.sparks;
     this.save.savedAt = Date.now();
-    try { localStorage.setItem(SAVE_KEY, JSON.stringify(this.save)); } catch (e) { return; }
+    try { localStorage.setItem(slotKey(this.slot), JSON.stringify(this.save)); } catch (e) { return; }
     if (show && this.hud) this.hud.saved(t('ui.saved'));
   }
 
@@ -194,8 +211,9 @@ class Game {
     this.audio.playMusic('title');
     const prog = this.hasProgress();
     const items = [];
-    if (prog) items.push({ label: t('ui.continue'), action: () => { this.hud.hideMenu(); this.enterKingdom(this.save.kingdom || 0); } });
-    items.push({ label: t('ui.newGame'), action: () => (prog ? this.confirmNew() : this.newGame()) });
+    if (prog) items.push({ label: `${t('ui.continue')} · ${t('ui.slot', { n: this.slot })}`, action: () => { this.hud.hideMenu(); this.enterKingdom(this.save.kingdom || 0); } });
+    items.push({ label: t('ui.newGame'), action: () => this.slotMenu('new') });
+    items.push({ label: t('ui.slots'), action: () => this.slotMenu('manage') });
     items.push(...this.settingsItems(() => this.toTitle()));
     if (window.lumiDesktop) items.push({ label: t('ui.quit'), action: () => window.lumiDesktop.quit() });
     this.hud.showMenu({ cls: 'title-screen', title: '<span class="logo">LUMI</span>', subtitle: t('ui.subtitle'), items });
@@ -230,7 +248,7 @@ class Game {
     const data = { game: 'LUMI', format: 1, exported: new Date().toISOString(), save: this.save, settings: { lang: getLang(), gfx: this.gfx.name } };
     const text = JSON.stringify(data, null, 1);
     const d = new Date();
-    const name = `LUMI-${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}.lumi-save`;
+    const name = `LUMI-${t('ui.slot', { n: this.slot }).replace(/\s+/g, '')}-${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}.lumi-save`;
     const done = (ok) => { this.hud.toast(ok ? t('ui.exported') : t('ui.exportFail'), 3); this.saveMenu(back); };
     if (window.lumiDesktop && window.lumiDesktop.saveFile) {
       window.lumiDesktop.saveFile(name, text).then((ok) => done(ok !== false)).catch(() => done(false));
@@ -295,13 +313,85 @@ class Game {
     back();
   }
 
-  confirmNew() {
+  // ---------------- Speicherplätze ----------------
+  slotLabel(n) {
+    const sv = n === this.slot ? this.save : this.readSlot(n);
+    const used = this.slotHasProgress(sv);
+    let info = `<small>${t('ui.slotEmpty')}</small>`;
+    if (used) {
+      const k = sv.kingdom || 0;
+      const shards = Object.keys(sv.bosses || {}).filter((w) => +w < 7).length;
+      const when = sv.savedAt ? new Date(sv.savedAt).toLocaleString(getLang(), { dateStyle: 'short', timeStyle: 'short' }) : '';
+      info = `<small>${t(`worlds.${k}.name`)} · ${when}</small>`;
+      return `<span class="lvl"><span class="nm">${n === this.slot ? '▶ ' : ''}${t('ui.slot', { n })}${info}</span><span class="ic">☾ ${this.slotMoons(sv)} · ${shards}/7 <span class="shard full"></span></span></span>`;
+    }
+    return `<span class="lvl"><span class="nm">${t('ui.slot', { n })}${info}</span><span class="ic"></span></span>`;
+  }
+
+  slotMenu(mode) {
+    const items = [];
+    for (let n = 1; n <= SLOTS; n++) {
+      items.push({
+        html: this.slotLabel(n),
+        action: () => {
+          const used = this.slotHasProgress(n === this.slot ? this.save : this.readSlot(n));
+          if (mode === 'new') { if (used) this.confirmNew(n); else { this.useSlot(n); this.newGame(); } }
+          else if (used) this.slotActions(n);
+          else { this.useSlot(n); this.newGame(); }
+        },
+      });
+    }
+    items.push({ label: t('ui.back'), action: () => this.toTitle() });
+    this.hud.showMenu({ cls: 'map', title: mode === 'new' ? t('ui.chooseSlot') : t('ui.slots'), items, sel: this.slot - 1 });
+  }
+
+  slotActions(n) {
+    const items = [
+      { label: t('ui.play'), action: () => { this.useSlot(n); this.hud.hideMenu(); this.enterKingdom(this.save.kingdom || 0); } },
+    ];
+    for (let m = 1; m <= SLOTS; m++) if (m !== n) items.push({ label: `${t('ui.copyTo')} ${t('ui.slot', { n: m })}`, action: () => this.copySlot(n, m) });
+    items.push({ label: t('ui.delete'), action: () => this.deleteSlot(n) });
+    items.push({ label: t('ui.back'), action: () => this.slotMenu('manage') });
+    this.hud.showMenu({ title: t('ui.slot', { n }), body: this.slotLabel(n), items });
+  }
+
+  copySlot(from, to) {
+    const doCopy = () => {
+      if (from === this.slot) this.writeSave(false);
+      const data = localStorage.getItem(slotKey(from));
+      try { localStorage.setItem(slotKey(to), data); } catch (e) { return; }
+      if (to === this.slot) this.save = this.readSlot(to);
+      this.hud.toast(t('ui.copied', { n: to }), 2.5);
+      this.slotMenu('manage');
+    };
+    if (!this.slotHasProgress(this.readSlot(to))) { doCopy(); return; }
+    this.hud.showMenu({ title: t('ui.slot', { n: to }), body: `<p>${t('ui.overwriteSlot', { n: to })}</p>${this.slotLabel(to)}`, items: [{ label: t('ui.copyTo') + ' ' + t('ui.slot', { n: to }), action: doCopy }, { label: t('ui.back'), action: () => this.slotActions(from) }], sel: 1 });
+  }
+
+  deleteSlot(n) {
+    this.hud.showMenu({
+      title: t('ui.delete') + '?', body: `<p>${t('ui.deleteConfirm', { n })}</p>${this.slotLabel(n)}`,
+      items: [
+        { label: t('ui.delete'), action: () => {
+          try { localStorage.removeItem(slotKey(n)); } catch (e) { /* egal */ }
+          if (n === this.slot) { this.save = this.emptySave(); this.sparks = 0; }
+          this.hud.toast(t('ui.deleted', { n }), 2.5);
+          this.slotMenu('manage');
+        } },
+        { label: t('ui.back'), action: () => this.slotActions(n) },
+      ],
+      sel: 1,
+    });
+  }
+
+  confirmNew(n = this.slot) {
+    const sv = n === this.slot ? this.save : this.readSlot(n);
     this.hud.showMenu({
       title: t('ui.newGame') + '?',
-      body: `${t('ui.progress')}: ☾ ${this.moonCountAll()} → 0`,
+      body: `<p>${t('ui.overwriteSlot', { n })}</p><p>☾ ${this.slotMoons(sv)} → 0</p>`,
       items: [
-        { label: t('ui.newGame'), action: () => { this.save = this.emptySave(); this.sparks = 0; this.writeSave(); this.newGame(); } },
-        { label: t('ui.back'), action: () => this.toTitle() },
+        { label: t('ui.newGame'), action: () => { this.useSlot(n); this.save = this.emptySave(); this.sparks = 0; this.writeSave(false); this.newGame(); } },
+        { label: t('ui.back'), action: () => this.slotMenu('new') },
       ],
       sel: 1,
     });

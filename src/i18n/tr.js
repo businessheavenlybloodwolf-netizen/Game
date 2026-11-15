@@ -1,6 +1,17 @@
 export default {
   name: 'Türkçe',
   ui: {
+    slots: "Kayıtlar",
+    slot: "Kayıt {n}",
+    slotEmpty: "Boş – yeni macera",
+    chooseSlot: "Bir kayıt yeri seç",
+    play: "Oyna",
+    copyTo: "Şuraya kopyala:",
+    delete: "Sil",
+    deleteConfirm: "Kayıt {n} gerçekten silinsin mi? Bu geri alınamaz.",
+    overwriteSlot: "Kayıt {n} üzerine yazılacak.",
+    copied: "Kayıt {n} içine kopyalandı!",
+    deleted: "Kayıt {n} silindi.",
     saveMenu: "Kayıt",
     saveInfo: "İlerleme otomatik olarak kaydedilir. Burada ayrıca dosya olarak yedekleyebilir veya başka bir cihaza taşıyabilirsin.",
     exportSave: "Dosyaya aktar",

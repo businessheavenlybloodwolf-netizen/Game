@@ -1,6 +1,17 @@
 export default {
   name: 'Français',
   ui: {
+    slots: "Sauvegardes",
+    slot: "Sauvegarde {n}",
+    slotEmpty: "Vide – nouvelle aventure",
+    chooseSlot: "Choisis un emplacement",
+    play: "Jouer",
+    copyTo: "Copier vers",
+    delete: "Supprimer",
+    deleteConfirm: "Vraiment supprimer la sauvegarde {n} ? C'est irréversible.",
+    overwriteSlot: "La sauvegarde {n} sera écrasée.",
+    copied: "Copiée vers la sauvegarde {n} !",
+    deleted: "Sauvegarde {n} supprimée.",
     saveMenu: "Sauvegarde",
     saveInfo: "La progression est sauvegardée automatiquement. Ici, tu peux aussi l'enregistrer dans un fichier ou l'emporter sur un autre appareil.",
     exportSave: "Exporter dans un fichier",

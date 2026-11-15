@@ -1,6 +1,17 @@
 export default {
   name: 'Deutsch',
   ui: {
+    slots: "Spielstände",
+    slot: "Spielstand {n}",
+    slotEmpty: "Leer – neues Abenteuer",
+    chooseSlot: "Speicherplatz wählen",
+    play: "Spielen",
+    copyTo: "Kopieren nach",
+    delete: "Löschen",
+    deleteConfirm: "Spielstand {n} wirklich löschen? Das kann nicht rückgängig gemacht werden.",
+    overwriteSlot: "Spielstand {n} wird überschrieben.",
+    copied: "In Spielstand {n} kopiert!",
+    deleted: "Spielstand {n} gelöscht.",
     saveMenu: "Speicherstand",
     saveInfo: "Der Fortschritt wird automatisch gespeichert. Hier kannst du ihn zusätzlich als Datei sichern oder auf ein anderes Gerät mitnehmen.",
     exportSave: "Als Datei exportieren",

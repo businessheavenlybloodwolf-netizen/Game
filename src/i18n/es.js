@@ -1,6 +1,17 @@
 export default {
   name: 'Español',
   ui: {
+    slots: "Partidas",
+    slot: "Partida {n}",
+    slotEmpty: "Vacía – nueva aventura",
+    chooseSlot: "Elige una ranura",
+    play: "Jugar",
+    copyTo: "Copiar a",
+    delete: "Borrar",
+    deleteConfirm: "¿Seguro que quieres borrar la partida {n}? No se puede deshacer.",
+    overwriteSlot: "La partida {n} se sobrescribirá.",
+    copied: "¡Copiada a la partida {n}!",
+    deleted: "Partida {n} borrada.",
     saveMenu: "Partida guardada",
     saveInfo: "El progreso se guarda automáticamente. Aquí también puedes guardarlo en un archivo o llevarlo a otro dispositivo.",
     exportSave: "Exportar a archivo",

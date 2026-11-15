@@ -106,6 +106,8 @@ Auf Handy und Tablet erscheinen Touch-Steuerelemente (Stick links, Knöpfe recht
 
 **Speichern:** automatisch, ohne Speicherpunkte. Das Spiel speichert bei jedem Mondsplitter, Schlüssel, Boss, jeder Reise, alle 15 Sekunden und beim Schließen oder Minimieren des Fensters. Eine kleine Anzeige „💾 Gespeichert“ bestätigt das. Gespeichert wird im Browser (`localStorage`) bzw. im Profil der Desktop-App. „Fortsetzen“ im Titelmenü führt zurück ins zuletzt besuchte Reich.
 
+**3 Speicherplätze:** Unter *Spielstände* im Titelmenü siehst du jeden Platz mit Reich, Mondsplittern, Kristallen und Speicherzeit. Jeder Platz lässt sich spielen, auf einen anderen Platz kopieren oder löschen (mit Rückfrage). *Neues Abenteuer* fragt nach dem Platz, *Fortsetzen* spielt den zuletzt benutzten. Ältere Spielstände landen automatisch auf Platz 1.
+
 **Speicherstand als Datei:** Unter *Speicherstand* im Haupt- und Pausenmenü lässt sich der Fortschritt als `.lumi-save`-Datei exportieren
 (Desktop-App: Speichern-Dialog, Standardordner *Dokumente*; Browser: Download) und wieder laden, z. B. als Sicherung oder für ein anderes Gerät.
 Beim Laden wird die Datei geprüft, und vor dem Überschreiben fragt das Spiel nach. Zum Testen: `lumi.html?w=4` startet direkt im Reich 5, `lumi.html?w=4&l=0` in dessen erster Herausforderung.

@@ -1,6 +1,17 @@
 export default {
   name: 'English',
   ui: {
+    slots: "Save slots",
+    slot: "Slot {n}",
+    slotEmpty: "Empty – new adventure",
+    chooseSlot: "Choose a save slot",
+    play: "Play",
+    copyTo: "Copy to",
+    delete: "Delete",
+    deleteConfirm: "Really delete slot {n}? This cannot be undone.",
+    overwriteSlot: "Slot {n} will be overwritten.",
+    copied: "Copied to slot {n}!",
+    deleted: "Slot {n} deleted.",
     saveMenu: "Save data",
     saveInfo: "Progress is saved automatically. Here you can also back it up as a file or take it to another device.",
     exportSave: "Export to file",
