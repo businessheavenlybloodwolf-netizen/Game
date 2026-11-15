@@ -208,7 +208,81 @@ class Game {
       { label: t('ui.controls'), action: () => this.showControls(back) },
       { label: `${t('ui.sound')}: ${this.audio.muted ? t('ui.off') : t('ui.on')}`, action: () => { this.audio.toggleMute(); back(); } },
       { label: t('ui.fullscreen'), action: () => { this.toggleFullscreen(); } },
+      { label: '💾 ' + t('ui.saveMenu'), action: () => this.saveMenu(back) },
     ];
+  }
+
+  // ---------------- Speicherstand als Datei ----------------
+  saveMenu(back) {
+    this.hud.showMenu({
+      title: t('ui.saveMenu'),
+      body: `<p>☾ ${this.moonCountAll()} / ${this.moonTotalAll()} · ${this.shardCount()} / 7 <span class="shard full"></span></p><p class="tip">${t('ui.saveInfo')}</p>`,
+      items: [
+        { label: t('ui.exportSave'), action: () => this.exportSave(back) },
+        { label: t('ui.importSave'), action: () => this.importSave(back) },
+        { label: t('ui.back'), action: back },
+      ],
+    });
+  }
+
+  exportSave(back) {
+    this.writeSave(false);
+    const data = { game: 'LUMI', format: 1, exported: new Date().toISOString(), save: this.save, settings: { lang: getLang(), gfx: this.gfx.name } };
+    const text = JSON.stringify(data, null, 1);
+    const d = new Date();
+    const name = `LUMI-${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}.lumi-save`;
+    const done = (ok) => { this.hud.toast(ok ? t('ui.exported') : t('ui.exportFail'), 3); this.saveMenu(back); };
+    if (window.lumiDesktop && window.lumiDesktop.saveFile) {
+      window.lumiDesktop.saveFile(name, text).then((ok) => done(ok !== false)).catch(() => done(false));
+      return;
+    }
+    try {
+      const url = URL.createObjectURL(new Blob([text], { type: 'application/json' }));
+      const a = document.createElement('a');
+      a.href = url; a.download = name; document.body.appendChild(a); a.click(); a.remove();
+      setTimeout(() => URL.revokeObjectURL(url), 5000);
+      done(true);
+    } catch (e) { done(false); }
+  }
+
+  importSave(back) {
+    const input = document.createElement('input');
+    input.type = 'file'; input.accept = '.lumi-save,.json,application/json';
+    input.onchange = () => {
+      const f = input.files && input.files[0];
+      if (!f) return;
+      f.text().then((text) => this.previewImport(text, f.name, back));
+    };
+    input.click();
+  }
+
+  previewImport(text, fileName, back) {
+    let data = null;
+    try { data = JSON.parse(text); } catch (e) { data = null; }
+    const valid = data && data.game === 'LUMI' && data.save && typeof data.save.moons === 'object';
+    if (!valid) { this.hud.toast(t('ui.importBad'), 3); this.audio.play('hurt'); return false; }
+    const moons = Object.values(data.save.moons).reduce((n, m) => n + Object.values(m || {}).reduce((a, b) => a + b, 0), 0);
+    this.hud.showMenu({
+      title: t('ui.importSave') + '?',
+      body: `<p>${t('ui.importConfirm')}</p><p>${fileName}<br>☾ ${moons} / ${this.moonTotalAll()}</p>`,
+      items: [
+        { label: t('ui.importSave'), action: () => this.applyImport(data) },
+        { label: t('ui.back'), action: () => this.saveMenu(back) },
+      ],
+      sel: 1,
+    });
+    return true;
+  }
+
+  applyImport(data) {
+    this.save = { ...this.emptySave(), ...data.save };
+    this.sparks = this.save.sparks || 0;
+    this.writeSave(false);
+    if (data.settings && data.settings.lang && LANGS[data.settings.lang]) { setLang(data.settings.lang); this.applyLangToDom(); }
+    this.audio.play('shard');
+    this.hud.hideMenu();
+    this.toTitle();
+    this.hud.toast(t('ui.importOk'), 3);
   }
 
   cycleGraphics(back) {

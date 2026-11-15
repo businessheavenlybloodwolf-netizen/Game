@@ -1,6 +1,15 @@
 export default {
   name: 'Deutsch',
   ui: {
+    saveMenu: "Speicherstand",
+    saveInfo: "Der Fortschritt wird automatisch gespeichert. Hier kannst du ihn zusätzlich als Datei sichern oder auf ein anderes Gerät mitnehmen.",
+    exportSave: "Als Datei exportieren",
+    importSave: "Aus Datei laden",
+    exported: "Speicherstand exportiert!",
+    exportFail: "Export nicht möglich.",
+    importBad: "Das ist keine gültige LUMI-Speicherdatei.",
+    importConfirm: "Dein aktueller Spielstand wird durch diese Datei ersetzt.",
+    importOk: "Speicherstand geladen!",
     saved: 'Gespeichert',
     peak: "Gipfel",
     needMoonsBoss: "Öffnet sich mit {n} Mondsplittern",

@@ -1,6 +1,15 @@
 export default {
   name: 'English',
   ui: {
+    saveMenu: "Save data",
+    saveInfo: "Progress is saved automatically. Here you can also back it up as a file or take it to another device.",
+    exportSave: "Export to file",
+    importSave: "Load from file",
+    exported: "Save exported!",
+    exportFail: "Export not possible.",
+    importBad: "This is not a valid LUMI save file.",
+    importConfirm: "Your current progress will be replaced by this file.",
+    importOk: "Save loaded!",
     saved: 'Saved',
     peak: "Summit",
     needMoonsBoss: "Opens with {n} moon shards",

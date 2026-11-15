@@ -1,6 +1,15 @@
 export default {
   name: 'Türkçe',
   ui: {
+    saveMenu: "Kayıt",
+    saveInfo: "İlerleme otomatik olarak kaydedilir. Burada ayrıca dosya olarak yedekleyebilir veya başka bir cihaza taşıyabilirsin.",
+    exportSave: "Dosyaya aktar",
+    importSave: "Dosyadan yükle",
+    exported: "Kayıt dışa aktarıldı!",
+    exportFail: "Dışa aktarma mümkün değil.",
+    importBad: "Bu geçerli bir LUMI kayıt dosyası değil.",
+    importConfirm: "Mevcut ilerlemen bu dosyayla değiştirilecek.",
+    importOk: "Kayıt yüklendi!",
     saved: 'Kaydedildi',
     peak: "Zirve",
     needMoonsBoss: "{n} ay parçasıyla açılır",

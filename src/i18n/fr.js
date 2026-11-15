@@ -1,6 +1,15 @@
 export default {
   name: 'Français',
   ui: {
+    saveMenu: "Sauvegarde",
+    saveInfo: "La progression est sauvegardée automatiquement. Ici, tu peux aussi l'enregistrer dans un fichier ou l'emporter sur un autre appareil.",
+    exportSave: "Exporter dans un fichier",
+    importSave: "Charger depuis un fichier",
+    exported: "Sauvegarde exportée !",
+    exportFail: "Export impossible.",
+    importBad: "Ce n'est pas un fichier de sauvegarde LUMI valide.",
+    importConfirm: "Ta progression actuelle sera remplacée par ce fichier.",
+    importOk: "Sauvegarde chargée !",
     saved: 'Sauvegardé',
     peak: "Sommet",
     needMoonsBoss: "S'ouvre avec {n} éclats de lune",

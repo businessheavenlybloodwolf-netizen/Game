@@ -1,6 +1,15 @@
 export default {
   name: 'Español',
   ui: {
+    saveMenu: "Partida guardada",
+    saveInfo: "El progreso se guarda automáticamente. Aquí también puedes guardarlo en un archivo o llevarlo a otro dispositivo.",
+    exportSave: "Exportar a archivo",
+    importSave: "Cargar desde archivo",
+    exported: "¡Partida exportada!",
+    exportFail: "No se pudo exportar.",
+    importBad: "No es un archivo de partida de LUMI válido.",
+    importConfirm: "Tu progreso actual se reemplazará por este archivo.",
+    importOk: "¡Partida cargada!",
     saved: 'Guardado',
     peak: "Cumbre",
     needMoonsBoss: "Se abre con {n} fragmentos lunares",

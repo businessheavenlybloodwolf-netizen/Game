@@ -1,5 +1,6 @@
 // Desktop-Version (Steam / itch.io App) – Electron-Hülle um das Spiel
-const { app, BrowserWindow, ipcMain, Menu } = require('electron');
+const { app, BrowserWindow, ipcMain, Menu, dialog } = require('electron');
+const fs = require('fs');
 const path = require('path');
 
 app.commandLine.appendSwitch('ignore-gpu-blocklist');
@@ -25,6 +26,14 @@ function createWindow() {
 }
 
 ipcMain.on('quit', () => app.quit());
+// Speicherstand als Datei exportieren (mit Speichern-Dialog)
+ipcMain.handle('save-file', async (e, name, text) => {
+  const win = BrowserWindow.fromWebContents(e.sender);
+  const r = await dialog.showSaveDialog(win, { defaultPath: path.join(app.getPath('documents'), name), filters: [{ name: 'LUMI', extensions: ['lumi-save'] }] });
+  if (r.canceled || !r.filePath) return false;
+  fs.writeFileSync(r.filePath, text, 'utf8');
+  return true;
+});
 ipcMain.on('fullscreen', (e) => { const w = BrowserWindow.fromWebContents(e.sender); if (w) w.setFullScreen(!w.isFullScreen()); });
 
 app.whenReady().then(createWindow);

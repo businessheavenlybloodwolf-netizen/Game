@@ -1,6 +1,15 @@
 export default {
   name: 'Italiano',
   ui: {
+    saveMenu: "Salvataggio",
+    saveInfo: "I progressi vengono salvati automaticamente. Qui puoi anche salvarli in un file o portarli su un altro dispositivo.",
+    exportSave: "Esporta su file",
+    importSave: "Carica da file",
+    exported: "Salvataggio esportato!",
+    exportFail: "Esportazione non riuscita.",
+    importBad: "Questo non è un file di salvataggio LUMI valido.",
+    importConfirm: "I tuoi progressi attuali verranno sostituiti da questo file.",
+    importOk: "Salvataggio caricato!",
     saved: 'Salvato',
     peak: "Vetta",
     needMoonsBoss: "Si apre con {n} frammenti di luna",
