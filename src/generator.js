@@ -420,7 +420,7 @@ export function generateLevel(L, spec) {
     L.cyl(ax, top, az, AR, { mat: S.big, h: 4 });
     L.link(edge(cur, heading), [ax - dx * (AR - 2), top, az - dz * (AR - 2)], { jump: 1 });
     L.checkpoint(ax - dx * (AR - 2) + dz * 2, top, az - dz * (AR - 2) - dx * 2);
-    L.hint(ax - dx * (AR - 2) - dz * 2, top, az - dz * (AR - 2) + dx * 2, 2.5, 'boss', false);
+    L.hint(ax - dx * (AR - 2) - dz * 2, top, az - dz * (AR - 2) + dx * 2, 2.5, 'boss_' + W.id, false);
     for (let i = 0; i < 8; i++) {
       const a = i / 8 * Math.PI * 2 + 0.2;
       const px = ax + Math.cos(a) * 12.5, pz = az + Math.sin(a) * 12.5;

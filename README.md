@@ -37,6 +37,8 @@ Die Sprache wird automatisch erkannt und ist im Hauptmenü und im Pausenmenü um
 | 7 | Korallentiefe | geringe Schwerkraft, Blasenströme, Quallen | Tiefenschlund |
 | 8 | Nebelreich | Uhrwerk, alles gemischt, Finale | Graf Nebelmaul |
 
+Jeder Boss hat ein eigenes Modell, eigene Angriffe und eine eigene Schwachstelle: eine abtauchende Knollen-Pflanze, einen Kristall-Stier, ein Bomben-Luftschiff, einen Magma-Golem, einen Eis-Kreisel auf glatter Arena, einen Sandwurm, eine Riesenkrake und den dreiphasigen Grafen mit Doppelgängern.
+
 ### Offene Welt
 
 Jede Welt ist ein frei begehbares **Reich**:
@@ -138,7 +140,7 @@ node tools/store-art.cjs   # Store-Grafiken nach ./store
 | `src/generator.js` | prozeduraler Generator für Reiche (offene Welt) und Herausforderungen |
 | `src/gfx.js` | Grafikstufen, Bloom, 4K |
 | `src/levels.js` | handgebaute Level |
-| `src/boss.js` | Bosse (parametrisiert pro Welt) |
+| `src/boss.js` | 8 eigenständige Bosse (gemeinsame Basis + eigene Angriffe und Schwachstellen) |
 | `src/i18n/` | alle Texte in 6 Sprachen |
 | `src/models.js` | alle 3D-Modelle |
 | `src/textures.js` | prozedurale Texturen |

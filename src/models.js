@@ -649,3 +649,181 @@ export function createGlimmling(color = 0xffb3d1) {
   root.userData = { body };
   return root;
 }
+
+// ================= Eigene Boss-Modelle =================
+function bossMat(color, map = true) {
+  const c = new THREE.Color(color);
+  const m = toon(c.getHex(), { map: map ? T.fogGray : null, emissive: c.clone().multiplyScalar(0.18).getHex(), ei: 1, unique: true });
+  m.userData.baseEmissive = m.emissive.getHex();
+  return m;
+}
+function bossEyes(parent, y, z, spread, size, pupil = 0xff3b5c) {
+  const S = new THREE.SphereGeometry(1, 14, 10);
+  for (const sx of [-1, 1]) {
+    const e = mesh(S, toon(0xfff4d8), sx * spread, y, z, parent); e.scale.set(size, size * 1.15, size * 0.5);
+    const p = mesh(S, basic(pupil), sx * spread * 0.96, y - size * 0.1, z + size * 0.42, parent); p.scale.setScalar(size * 0.42); p.userData.noOutline = true;
+    const b = mesh(new THREE.BoxGeometry(size * 2.1, size * 0.4, size * 0.4), toon(0x1a0f2a), sx * spread, y + size * 1.15, z + 0.05, parent); b.rotation.z = sx * 0.35; b.userData.noOutline = true;
+  }
+}
+
+// 1 · Moderich: welke Riesenknolle mit Blätterkranz
+export function createBulbBoss(cfg) {
+  const root = new THREE.Group(), body = new THREE.Group(); root.add(body);
+  const m = bossMat(cfg.color);
+  const bulb = mesh(new THREE.SphereGeometry(1.5, 24, 16), m, 0, 1.3, 0, body); bulb.scale.set(1, 0.88, 1);
+  mesh(new THREE.CylinderGeometry(0.75, 0.95, 0.6, 14), toon(0x4a7a2a), 0, 0.3, 0, body);
+  bossEyes(body, 1.55, 1.25, 0.5, 0.3);
+  const mouth = mesh(new THREE.SphereGeometry(1, 16, 10), toon(0x2a140a), 0, 0.95, 1.3, body); mouth.scale.set(0.6, 0.25, 0.2);
+  const leafM = toon(cfg.accent ?? 0x5a9a3a);
+  const leaves = new THREE.Group(); leaves.position.y = 2.5; body.add(leaves);
+  for (let i = 0; i < 7; i++) {
+    const a = i / 7 * Math.PI * 2;
+    const lf = mesh(new THREE.SphereGeometry(1, 10, 8), leafM, Math.cos(a) * 0.55, 0.15, Math.sin(a) * 0.55, leaves);
+    lf.scale.set(0.3, 0.1, 0.9); lf.rotation.y = -a + Math.PI / 2; lf.rotation.x = 0.7;
+  }
+  const petalM = toon(0xd0a060);
+  for (let i = 0; i < 5; i++) {
+    const a = i / 5 * Math.PI * 2 + 0.3;
+    const p = mesh(new THREE.SphereGeometry(1, 8, 6), petalM, Math.cos(a) * 1.45, 1.6, Math.sin(a) * 1.45, body);
+    p.scale.set(0.45, 0.1, 0.3); p.rotation.y = -a; p.rotation.z = -0.9;
+  }
+  addOutline(bulb, 0.06);
+  root.userData = { body, leaves, mats: [m] };
+  return root;
+}
+
+// 2 · Splitterzahn: vierbeiniges Kristallwesen
+export function createCrystalBeast(cfg) {
+  const root = new THREE.Group(), body = new THREE.Group(); root.add(body);
+  const m = bossMat(cfg.color);
+  const cr = toon(0x9ff4ff, { emissive: 0x3fb8ff, ei: 0.7 });
+  const torso = mesh(new THREE.SphereGeometry(1, 22, 14), m, 0, 1.6, 0, body); torso.scale.set(1.6, 1.1, 2.2);
+  const head = new THREE.Group(); head.position.set(0, 1.9, 2.1); body.add(head);
+  const hd = mesh(new THREE.SphereGeometry(0.95, 18, 12), m, 0, 0, 0, head); hd.scale.set(1, 0.9, 1.1);
+  bossEyes(head, 0.25, 0.75, 0.38, 0.22, 0xff8a2a);
+  for (const sx of [-1, 1]) { const h = mesh(new THREE.ConeGeometry(0.22, 1.3, 7), cr, sx * 0.45, 0.55, 0.6, head); h.rotation.x = 1.1; h.rotation.z = -sx * 0.3; }
+  for (let i = 0; i < 4; i++) { const s = mesh(new THREE.ConeGeometry(0.35, 1.3 - i * 0.15, 6), cr, 0, 2.6, 0.9 - i * 0.75, body); s.rotation.x = -0.3; }
+  const legs = [];
+  for (const [sx, sz] of [[-1, 1], [1, 1], [-1, -1], [1, -1]]) {
+    const piv = new THREE.Group(); piv.position.set(sx * 1.0, 1.1, sz * 1.3); body.add(piv);
+    mesh(new THREE.CylinderGeometry(0.3, 0.36, 1.2, 8), m, 0, -0.6, 0, piv);
+    legs.push(piv);
+  }
+  addOutline(torso, 0.06); addOutline(hd, 0.05);
+  root.userData = { body, legs, head, mats: [m] };
+  return root;
+}
+
+// 3 · Kapitän Dunstbart auf seinem Nebel-Luftschiff
+export function createSkyShip(cfg) {
+  const root = new THREE.Group();
+  const wood = toon(0x9a6438, { map: T.wood });
+  const hull = mesh(new THREE.BoxGeometry(5.5, 1.3, 2.4), wood, 0, 0, 0, root);
+  mesh(new THREE.BoxGeometry(1.2, 1.0, 2.0), wood, 2.9, 0.15, 0, root).rotation.z = 0.5;
+  const bal = mesh(new THREE.SphereGeometry(1, 24, 14), toon(0xffffff, { map: T.clothRed }), 0, 4.2, 0, root); bal.scale.set(3.6, 1.8, 1.9);
+  for (const sx of [-1.6, 1.6]) mesh(new THREE.CylinderGeometry(0.05, 0.05, 2.6, 4), toon(0x3a2614), sx, 2.0, 0, root);
+  const cannon = mesh(new THREE.CylinderGeometry(0.3, 0.38, 1.6, 12), toon(0x2a2a3a), 0.6, 0.6, 1.2, root); cannon.rotation.x = Math.PI / 2;
+  const capM = bossMat(cfg.color);
+  const cap = new THREE.Group(); cap.position.set(-1, 0.65, 0); root.add(cap);
+  const cb = mesh(new THREE.SphereGeometry(0.85, 18, 12), capM, 0, 0.75, 0, cap);
+  bossEyes(cap, 0.95, 0.68, 0.28, 0.17);
+  mesh(new THREE.CylinderGeometry(1.0, 1.0, 0.1, 18), toon(0x2a1a10), 0, 1.5, 0, cap);
+  mesh(new THREE.CylinderGeometry(0.5, 0.6, 0.6, 14), toon(0x2a1a10), 0, 1.85, 0, cap);
+  const beard = mesh(new THREE.SphereGeometry(0.5, 12, 8), toon(0xd8d0f0, { transparent: true, opacity: 0.85 }), 0, 0.35, 0.55, cap); beard.scale.set(1.2, 0.8, 0.6); beard.userData.noOutline = true;
+  const prop = new THREE.Group(); prop.position.set(-3, 0.2, 0); root.add(prop);
+  for (let i = 0; i < 3; i++) { const p = mesh(new THREE.BoxGeometry(0.08, 1.4, 0.3), toon(0xe2b75e), 0, 0, 0, prop); p.rotation.x = i / 3 * Math.PI * 2; }
+  addOutline(hull, 0.05); addOutline(cb, 0.04);
+  root.userData = { captain: cap, cannon, prop, mats: [capM] };
+  return root;
+}
+
+// 4 · Schwelgrimm: Magma-Golem mit schwebenden Fäusten
+export function createMagmaGolem(cfg) {
+  const root = new THREE.Group(), body = new THREE.Group(); root.add(body);
+  const m = toon(0x3a2424, { map: T.basalt, emissive: 0x401008, ei: 1, unique: true }); m.userData.baseEmissive = 0x401008;
+  const glow = toon(0xffb02e, { emissive: 0xff6a1a, ei: 1 });
+  const torso = mesh(new THREE.DodecahedronGeometry(2.0, 1), m, 0, 3.2, 0, body); torso.scale.set(1, 1.15, 0.85);
+  const core = mesh(new THREE.SphereGeometry(0.6, 12, 8), glow, 0, 3.4, 1.55, body); core.add(glowSprite(0xff8a2a, 3, 0.7));
+  const head = mesh(new THREE.DodecahedronGeometry(0.95, 0), m, 0, 5.6, 0.2, body);
+  bossEyes(body, 5.65, 0.95, 0.35, 0.2, 0xffd23f);
+  for (const sx of [-1, 1]) { const h = mesh(new THREE.ConeGeometry(0.28, 1.1, 6), glow, sx * 0.7, 6.4, 0.1, body); h.rotation.z = -sx * 0.5; }
+  for (const sx of [-1, 1]) mesh(new THREE.CylinderGeometry(0.6, 0.75, 1.6, 8), m, sx * 0.9, 0.8, 0, body);
+  const fists = [];
+  for (const sx of [-1, 1]) {
+    const f = new THREE.Group(); root.add(f);
+    const fm = mesh(new THREE.DodecahedronGeometry(1.1, 1), m, 0, 0, 0, f);
+    const knuckle = mesh(new THREE.SphereGeometry(0.45, 10, 8), glow, 0, -0.2, 0.75, f); knuckle.userData.noOutline = true;
+    addOutline(fm, 0.05);
+    f.position.set(sx * 3.6, 3.3, 0.6);
+    fists.push(f);
+  }
+  addOutline(torso, 0.07); addOutline(head, 0.05);
+  root.userData = { body, fists, mats: [m], glow };
+  return root;
+}
+
+// 5 · Frierich: eisiger Schlittschuhläufer
+export function createFrostBoss(cfg) {
+  const root = new THREE.Group(), body = new THREE.Group(); root.add(body);
+  const m = bossMat(cfg.color);
+  const b = mesh(new THREE.SphereGeometry(1.6, 24, 16), m, 0, 1.75, 0, body);
+  bossEyes(body, 2.15, 1.42, 0.5, 0.28, 0x3a7aff);
+  const iceM = toon(0xe8f8ff, { emissive: 0x7fd8ff, ei: 0.5 });
+  for (let i = 0; i < 7; i++) { const a = i / 7 * Math.PI * 2; const c = mesh(new THREE.ConeGeometry(0.22, 1.1, 6), iceM, Math.cos(a) * 0.8, 3.45, Math.sin(a) * 0.8, body); c.rotation.z = -Math.cos(a) * 0.35; c.rotation.x = Math.sin(a) * 0.35; }
+  const scarf = mesh(new THREE.TorusGeometry(1.25, 0.2, 8, 24), toon(0x2f7ad8), 0, 2.85, 0, body); scarf.rotation.x = Math.PI / 2;
+  for (const sx of [-1, 1]) {
+    mesh(new THREE.BoxGeometry(0.5, 0.3, 1.1), toon(0x2a2a3a), sx * 0.7, 0.3, 0, body);
+    mesh(new THREE.BoxGeometry(0.08, 0.12, 1.5), toon(0xd8e8ff), sx * 0.7, 0.06, 0.1, body);
+  }
+  addOutline(b, 0.06);
+  root.userData = { body, mats: [m] };
+  return root;
+}
+
+// 6 · Sandflüsterer: Sandwurm aus Segmenten mit leuchtendem Schwanz
+export function createSandworm(cfg) {
+  const root = new THREE.Group();
+  const m = bossMat(cfg.color);
+  const head = new THREE.Group(); root.add(head);
+  const h = mesh(new THREE.SphereGeometry(1.5, 20, 14), m, 0, 0, 0, head); h.scale.set(1, 1.1, 1);
+  bossEyes(head, 0.6, 1.2, 0.55, 0.27, 0xffb02e);
+  const jawM = toon(0xfff1d6);
+  for (const sx of [-1, 1]) { const j = mesh(new THREE.ConeGeometry(0.28, 1.4, 6), jawM, sx * 0.7, -0.5, 1.3, head); j.rotation.x = 1.2; j.rotation.z = sx * 0.4; }
+  const crown = toon(cfg.accent ?? 0x6a4a2a);
+  for (let i = 0; i < 5; i++) { const a = i / 5 * Math.PI - Math.PI / 2; mesh(new THREE.ConeGeometry(0.2, 0.8, 6), crown, Math.sin(a) * 0.9, 1.5, Math.cos(a) * -0.3, head); }
+  addOutline(h, 0.05);
+  const segs = [];
+  for (let i = 0; i < 8; i++) {
+    const r = 1.3 - i * 0.08;
+    const sg = mesh(new THREE.SphereGeometry(r, 16, 10), m, 0, -100, 0, root);
+    if (i % 2) { const ring = mesh(new THREE.TorusGeometry(r * 0.95, 0.1, 6, 20), crown, 0, 0, 0, sg); ring.rotation.x = Math.PI / 2; }
+    segs.push({ mesh: sg, r });
+  }
+  const tail = new THREE.Group(); root.add(tail);
+  mesh(new THREE.ConeGeometry(0.6, 1.8, 10), m, 0, 0.9, 0, tail);
+  const gem = mesh(new THREE.OctahedronGeometry(0.45), toon(0xfff3b0, { emissive: 0xffc23a, ei: 1 }), 0, 1.9, 0, tail);
+  gem.add(glowSprite(0xffd23f, 2.6, 0.9));
+  root.userData = { head, segs, tail, gem, mats: [m] };
+  return root;
+}
+
+// 7 · Tiefenschlund: Riesenkrake
+export function createSquid(cfg) {
+  const root = new THREE.Group(), body = new THREE.Group(); root.add(body);
+  const m = bossMat(cfg.color);
+  const mantle = mesh(new THREE.SphereGeometry(1, 24, 16), m, 0, 0, 0, body); mantle.scale.set(2.2, 2.4, 2.2);
+  const fin = toon(cfg.accent ?? 0xff7a9a);
+  for (const sx of [-1, 1]) { const f = mesh(new THREE.SphereGeometry(1, 10, 8), fin, sx * 1.8, 1.5, 0, body); f.scale.set(0.9, 0.5, 0.15); f.rotation.z = sx * 0.6; }
+  bossEyes(body, -0.4, 1.95, 0.85, 0.42, 0x6fe8d8);
+  const tentacles = [];
+  for (let i = 0; i < 8; i++) {
+    const a = i / 8 * Math.PI * 2;
+    const piv = new THREE.Group(); piv.position.set(Math.cos(a) * 1.3, -1.9, Math.sin(a) * 1.3); body.add(piv);
+    const t1 = mesh(new THREE.CylinderGeometry(0.32, 0.12, 3.2, 8), i % 2 ? m : fin, 0, -1.6, 0, piv);
+    piv.userData.a = a; tentacles.push(piv);
+    void t1;
+  }
+  addOutline(mantle, 0.07);
+  root.userData = { body, tentacles, mats: [m] };
+  return root;
+}

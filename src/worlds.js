@@ -7,7 +7,7 @@ export const WORLDS = [
     style: { big: 'grass', small: 'grass', pillar: 'stone', mover: 'wood', crumbleMat: 'stone', bridge: 'wood', blinkMat: 'wood', decor: 'meadow', trees: ['round', 'blossom'], bouncerColor: 0xff7ab8, goalMat: 'stone', islandKind: 'round' },
     enemies: ['nebling', 'nebling', 'flatterling'],
     seg: { hops: 3, stairs: 2, descend: 1, moverGap: 1, bounceUp: 1.5, pillars: 1, bridge: 1, circleMover: 0.4 },
-    boss: { color: 0xa87a58, accent: 0x5a9a3a, accentGlow: 0x2a5a1a, style: 'leaves', puff: 0xc8b090, monocle: false, hp: 3, speed: 0.8, minion: 'nebling' },
+    boss: { type: 'bulb', color: 0xa87a58, accent: 0x5a9a3a, accentGlow: 0x2a5a1a, style: 'leaves', puff: 0xc8b090, monocle: false, hp: 3, speed: 0.8, minion: 'nebling' },
   },
   {
     id: 'crystal', music: 'crystal', color: '#8ff3ff',
@@ -15,7 +15,7 @@ export const WORLDS = [
     style: { big: 'crystal', small: 'crystal', pillar: 'crystal', mover: 'stone', crumbleMat: 'stone', bridge: 'stone', blinkMat: 'crystal', decor: 'crystal', trees: ['crystal'], crystalColor: 0x8ff3ff, rockColor: 0x5a4a7a, firebarColor: 0xff6ad5, bouncerColor: 0x7ef0ff, goalMat: 'crystal', islandKind: 'crystal' },
     enemies: ['nebling', 'dornling', 'flatterling'],
     seg: { hops: 2, crumble: 2, firebar: 1.5, moverGap: 1, lift: 1, stairs: 1, descend: 1, pillars: 1 },
-    boss: { color: 0x7a8ae0, accent: 0x9ff4ff, accentGlow: 0x5fd8ff, style: 'spikes', puff: 0x9a8ad6, monocle: false, hp: 3, speed: 0.95, minion: 'dornling' },
+    boss: { type: 'beast', color: 0x7a8ae0, accent: 0x9ff4ff, accentGlow: 0x5fd8ff, style: 'spikes', puff: 0x9a8ad6, monocle: false, hp: 3, speed: 0.95, minion: 'dornling' },
   },
   {
     id: 'sky', music: 'sky', color: '#ffd28a',
@@ -23,7 +23,7 @@ export const WORLDS = [
     style: { big: 'wood', small: 'wood', pillar: 'metal', mover: 'metal', crumbleMat: 'wood', bridge: 'wood', blinkMat: 'metal', decor: 'none', trees: [], bouncerColor: 0xffb347, goalMat: 'metal', firebarColor: 0xff8a3c, islandKind: 'round', ships: true },
     enemies: ['flatterling', 'nebling', 'dornling'],
     seg: { updraft: 2, moverGap: 2, bounceUp: 1, hops: 2, bridge: 1.2, circleMover: 1, crumble: 0.8 },
-    boss: { color: 0x8a7ab0, accent: 0x3a2a1a, accentGlow: 0x000000, style: 'hat', puff: 0xd8d0f0, monocle: false, hp: 4, speed: 1.0, minion: 'flatterling' },
+    boss: { type: 'ship', color: 0x8a7ab0, accent: 0x3a2a1a, accentGlow: 0x000000, style: 'hat', puff: 0xd8d0f0, monocle: false, hp: 4, speed: 1.0, minion: 'flatterling' },
   },
   {
     id: 'lava', music: 'lava', color: '#ff7a2a', killY: -12,
@@ -32,7 +32,7 @@ export const WORLDS = [
       tints: { nebling: 0xd06a5a, dornling: 0xff8a2a, flatterling: 0xa04a4a } },
     enemies: ['dornling', 'nebling', 'flatterling'],
     seg: { hops: 2, geyser: 2, firebar: 2, crumble: 1.5, moverGap: 1, lift: 1, stairs: 1 },
-    boss: { color: 0xc8604a, accent: 0x2a1010, accentGlow: 0xff5a1a, style: 'horns', puff: 0x8a5a5a, monocle: false, hp: 4, speed: 1.1, minion: 'dornling', orb: 0xff6a1a },
+    boss: { type: 'golem', color: 0xc8604a, accent: 0x2a1010, accentGlow: 0xff5a1a, style: 'horns', puff: 0x8a5a5a, monocle: false, hp: 4, speed: 1.1, minion: 'dornling', orb: 0xff6a1a },
   },
   {
     id: 'ice', music: 'ice', color: '#bfe8ff',
@@ -41,7 +41,7 @@ export const WORLDS = [
       tints: { nebling: 0x8ab0e8, dornling: 0x6ad0ff, flatterling: 0x7a90d0 } },
     enemies: ['nebling', 'dornling', 'flatterling'],
     seg: { iceSlide: 2, hops: 2, blink: 1.5, bounceUp: 1, moverGap: 1, descend: 1, crumble: 1 },
-    boss: { color: 0x9ac8f0, accent: 0xe8f8ff, accentGlow: 0x7fd8ff, style: 'spikes', puff: 0xe0f0ff, monocle: false, hp: 4, speed: 1.15, minion: 'nebling', orb: 0x7fd8ff },
+    boss: { type: 'frost', color: 0x9ac8f0, accent: 0xe8f8ff, accentGlow: 0x7fd8ff, style: 'spikes', puff: 0xe0f0ff, monocle: false, hp: 4, speed: 1.15, minion: 'nebling', orb: 0x7fd8ff },
   },
   {
     id: 'desert', music: 'desert', color: '#f2c96a',
@@ -50,7 +50,7 @@ export const WORLDS = [
       tints: { nebling: 0xb08a6a, dornling: 0xd0a040, flatterling: 0x9a7a5a } },
     enemies: ['nebling', 'dornling', 'flatterling'],
     seg: { pillars: 2, lift: 1.5, crumble: 1.5, blink: 1.5, hops: 1.5, firebar: 1, moverGap: 1 },
-    boss: { color: 0xc8a878, accent: 0x6a4a2a, accentGlow: 0xffa040, style: 'crown', puff: 0xe8d0a0, monocle: false, hp: 5, speed: 1.2, minion: 'flatterling', orb: 0xffb040 },
+    boss: { type: 'worm', color: 0xc8a878, accent: 0x6a4a2a, accentGlow: 0xffa040, style: 'crown', puff: 0xe8d0a0, monocle: false, hp: 5, speed: 1.2, minion: 'flatterling', orb: 0xffb040 },
   },
   {
     id: 'coral', music: 'coral', color: '#6fe8d8', gravity: 0.65,
@@ -59,7 +59,7 @@ export const WORLDS = [
       tints: { nebling: 0x5aa0c8, dornling: 0xff7a9a, flatterling: 0x7a6ad8 } },
     enemies: ['flatterling', 'nebling', 'dornling'],
     seg: { updraft: 2, bounceUp: 2, circleMover: 1.5, hops: 2, blink: 1, descend: 1 },
-    boss: { color: 0x5a8ac8, accent: 0xff7a9a, accentGlow: 0xd03a6a, style: 'tentacles', puff: 0x7ad0e0, monocle: false, hp: 5, speed: 1.25, minion: 'flatterling', orb: 0x6fe8d8 },
+    boss: { type: 'squid', color: 0x5a8ac8, accent: 0xff7a9a, accentGlow: 0xd03a6a, style: 'tentacles', puff: 0x7ad0e0, monocle: false, hp: 5, speed: 1.25, minion: 'flatterling', orb: 0x6fe8d8 },
   },
   {
     id: 'fog', music: 'tower', color: '#c59bff', killY: -20,
@@ -67,7 +67,7 @@ export const WORLDS = [
     style: { big: 'tower', small: 'brick', pillar: 'brick', mover: 'clock', crumbleMat: 'brick', bridge: 'darkwood', blinkMat: 'clock', decor: 'crystal', trees: ['crystal'], crystalColor: 0xc59bff, rockColor: 0x3a2a4a, goalMat: 'brick', gearColor: 0xa08ad0, islandKind: 'crystal', gears: true, bouncerColor: 0xc59bff },
     enemies: ['nebling', 'dornling', 'flatterling'],
     seg: { circleMover: 2, blink: 2, crumble: 1.5, firebar: 1.5, hops: 1.5, moverGap: 1, lift: 1, updraft: 0.8 },
-    boss: { color: 0x9a7ad8, style: 'crown', hp: 6, speed: 1.35, minion: 'nebling', final: true },
+    boss: { type: 'final', color: 0x9a7ad8, style: 'crown', hp: 6, speed: 1.35, minion: 'nebling', final: true },
   },
 ];
 

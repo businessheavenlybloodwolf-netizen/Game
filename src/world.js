@@ -3,7 +3,7 @@ import * as THREE from 'three';
 import * as M from './models.js';
 import { rng } from './textures.js';
 import { boxCollider, cylCollider, moveCollider, overlapXZ } from './physics.js';
-import { Boss } from './boss.js';
+import { createBossFor } from './boss.js';
 import { WORLDS } from './worlds.js';
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 import { generateLevel, generateKingdom } from './generator.js';
@@ -669,7 +669,17 @@ export class Level {
     // Propeller-Sockel
     const base = new THREE.Mesh(new THREE.CylinderGeometry(r * 0.9, r, 0.5, 16), M.toon(0xe2b75e, { map: this.T.metal }));
     base.position.set(x, y0, z); this.add(base);
-    this.updrafts.push({ x, z, r, y0, y1, strength, tex, mesh: m });
+    const u = { x, z, r, y0, y1, strength, tex, mesh: m, base };
+    this.updrafts.push(u);
+    return u;
+  }
+  addUpdraft(x, z, r, y0, y1, strength) { return this.updraft(x, z, r, y0, y1, strength); }
+  removeUpdraft(u) {
+    const i = this.updrafts.indexOf(u);
+    if (i < 0) return;
+    this.updrafts.splice(i, 1);
+    this.group.remove(u.mesh); this.group.remove(u.base);
+    u.mesh.geometry.dispose(); u.mesh.material.dispose(); u.tex.dispose();
   }
 
   hint(x, top, z, r, text, sign = true) {
@@ -678,7 +688,7 @@ export class Level {
   }
 
   bossAt(x, top, z, arenaR) {
-    this.boss = new Boss(this, x, top, z, arenaR, this.worldDef.boss);
+    this.boss = createBossFor(this, x, top, z, arenaR, this.worldDef.boss);
   }
 
   // ---------------- Deko ----------------

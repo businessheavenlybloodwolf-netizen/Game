@@ -623,9 +623,7 @@ class Game {
       const dx = cp.x - c.x, dz = cp.z - c.z, l = Math.hypot(dx, dz);
       pl.reset(c.x + dx / l * 4.5, c.y, c.z + dz / l * 4.5, Math.atan2(-dx, -dz));
       this.promo.a = Math.atan2(dx, dz);
-      b.pos.set(c.x, b.top + 6.5, c.z);
-      b.mesh.rotation.y = Math.atan2(dx, dz);
-      b.state = 'promo';
+      b.promoPose(Math.atan2(dx, dz));
     }
     const logo = p.get('logo') || 'none';
     if (logo !== 'none') {
