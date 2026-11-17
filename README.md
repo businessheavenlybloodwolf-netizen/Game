@@ -81,8 +81,18 @@ Die Grafikstufe lässt sich im Haupt- und Pausenmenü umschalten.
 |---|---|---|
 | Niedrig | 1× | weniger Deko, 1024er-Schatten |
 | Mittel (Standard auf Handys) | bis 1,5× | 1024er-Schatten, ohne Kantenglättung und Punktlicht |
-| Hoch (Standard auf dem PC) | bis 1,5× | Bloom-Leuchten |
-| Ultra | **bis 3840×2160 (4K)**, auf kleineren Bildschirmen als Supersampling | 4096er-Schatten, doppelt so scharfe Texturen, mehr Deko, weitere Sicht |
+| Hoch (Standard auf dem PC) | bis 1,5× | **Next-Gen-Renderer** (siehe unten), animiertes 3D-Gras, 2048er-Schatten |
+| Ultra | **bis 3840×2160 (4K)**, auf kleineren Bildschirmen als Supersampling | Next-Gen + **Ambient Occlusion (GTAO)**, mehr als doppelt so dichtes Gras, 4096er-Schatten, mehr Deko und Partikel, weitere Sicht |
+
+**Next-Gen-Renderer (nur PC-Stufen Hoch und Ultra)**, die Handy-Stufen behalten den klassischen Toon-Look:
+- **PBR-Materialien** (physikalisch basiert) mit Rauheit und Metall je Oberfläche: Eis und Kristalle glänzen, Metall spiegelt, Erde und Stein bleiben matt.
+- **Normal-Maps**, die beim Start aus den gemalten Texturen berechnet werden: Fugen, Risse, Maserung und Pflastersteine bekommen echte Tiefe im Licht.
+- **Image Based Lighting:** Der Himmel jeder Welt wird in eine Umgebungskarte gerendert. Daraus kommen weiches Rundum-Licht und Spiegelungen.
+- **Filmisches Tone-Mapping** (HDR) und **Farbkorrektur** mit Kontrast, Sättigung, Split-Toning, Vignette und dezenter chromatischer Aberration.
+- **Lichtstrahlen (God Rays)**, wenn man Richtung Sonne schaut, und HDR-Bloom auf allem, was leuchtet.
+- **Prozedurale Schichtwolken** am Himmel, die langsam ziehen, in der passenden Farbe jeder Welt.
+- **Animiertes 3D-Gras** auf allen Wiesen: Hunderttausende Halme mit Wind, Lumi drückt sie beim Durchlaufen zur Seite. In der Ferne blenden sie weich aus.
+- **Feinere Geometrie:** Runde Formen werden doppelt so fein unterteilt (glatte Silhouetten), dünnere Konturlinien, weichere Schatten mit größerer Reichweite.
 
 **Performance:** Unbewegliche Teile werden beim Laden pro Material zu großen Meshes verschmolzen (Static Batching in 60-m-Kacheln),
 Funken per Instancing gezeichnet und Figuren intern zusammengefasst. Das Bild bleibt dabei identisch, aber ein Reich braucht nur noch rund

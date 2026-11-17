@@ -7,6 +7,7 @@ import { createBossFor } from './boss.js';
 import { WORLDS } from './worlds.js';
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 import { generateLevel, generateKingdom } from './generator.js';
+import { Grass } from './grass.js';
 
 const SURF = {
   grass: ['grass', 'dirt'], meadow: ['grassPlain', 'dirt'], stone: ['stone', 'stone'],
@@ -16,6 +17,8 @@ const SURF = {
   basalt: ['basaltTop', 'basalt'], snow: ['snow', 'snowCliff'], ice: ['ice', 'ice'], sandstone: ['sandTop', 'sandstone'],
   coral: ['coral', 'seaRock'], sea: ['seaRock', 'seaRock'], clock: ['clockTop', 'brick'],
 };
+
+const GRASSY = new Set(['grass', 'meadow']);
 
 function planarUV(geo, ox, oy, oz, tile) {
   const p = geo.attributes.position, n = geo.attributes.normal, uv = geo.attributes.uv;
@@ -59,10 +62,24 @@ function getStreakTex() {
 const _pc = new THREE.Vector3(), _wp = new THREE.Vector3(), _m4 = new THREE.Matrix4(), _q = new THREE.Quaternion(), _sc = new THREE.Vector3(), _up = new THREE.Vector3(0, 1, 0);
 
 const SKY_VS = `varying vec3 vDir; void main(){ vDir = normalize(position); vec4 p = projectionMatrix * modelViewMatrix * vec4(position,1.0); gl_Position = p.xyww; }`;
-const SKY_FS = `uniform vec3 top; uniform vec3 horizon; uniform vec3 bottom; uniform vec3 sunDir; uniform vec3 sunCol; uniform float stars; uniform float linOut; varying vec3 vDir;
+const SKY_FS = `uniform vec3 top; uniform vec3 horizon; uniform vec3 bottom; uniform vec3 sunDir; uniform vec3 sunCol; uniform float stars; uniform float linOut;
+uniform float clouds; uniform float time; uniform vec3 cloudCol; varying vec3 vDir;
 float hash(vec3 p){ p = fract(p*0.3183099+.1); p*=17.0; return fract(p.x*p.y*p.z*(p.x+p.y+p.z)); }
+float h2(vec2 p){ return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
+float vn(vec2 p){ vec2 i = floor(p), f = fract(p); f = f*f*(3.0-2.0*f);
+  return mix(mix(h2(i), h2(i+vec2(1,0)), f.x), mix(h2(i+vec2(0,1)), h2(i+vec2(1,1)), f.x), f.y); }
+float fbm(vec2 p){ float a = 0.5, s = 0.0; for (int i = 0; i < 5; i++) { s += a * vn(p); p = p * 2.03 + vec2(1.7, 9.2); a *= 0.5; } return s; }
 void main(){ vec3 d = normalize(vDir); float h = d.y; vec3 c = h > 0.0 ? mix(horizon, top, pow(h, 0.55)) : mix(horizon, bottom, pow(-h, 0.45));
  float s = max(dot(d, normalize(sunDir)), 0.0); c += sunCol * (pow(s, 200.0) * 1.5 + pow(s, 12.0) * 0.25);
+ if (clouds > 0.0 && h > 0.0) {
+   // weiche Schichtwolken (PC-Next-Gen): Projektion auf eine Wolkenebene, langsam ziehend
+   vec2 q = d.xz / (h + 0.12) * 1.6 + vec2(time * 0.012, time * 0.004);
+   float n = fbm(q);
+   float m = smoothstep(0.48, 0.78, n) * smoothstep(0.0, 0.22, h) * clouds;
+   float shade = 0.75 + 0.25 * smoothstep(0.5, 0.9, fbm(q * 1.7 + 3.1));
+   vec3 cc = cloudCol * shade + sunCol * pow(s, 6.0) * 0.6;
+   c = mix(c, cc, m);
+ }
  if (stars > 0.0 && h > 0.0) { vec3 q = floor(d * 220.0); float st = step(0.997, hash(q)); c += vec3(st) * stars * h; }
  if (linOut > 0.5) c = pow(max(c, vec3(0.0)), vec3(2.2)); gl_FragColor = vec4(c, 1.0); }`;
 
@@ -89,6 +106,7 @@ export class Level {
     this.sparks = []; this.hearts = []; this.enemies = []; this.movers = []; this.crumbles = [];
     this.bouncers = []; this.checkpoints = []; this.updrafts = []; this.firebars = []; this.hints = [];
     this.crates = []; this.anim = []; this.projectiles = [];
+    this.grassAreas = []; this.grass = null;
     this.goal = null; this.boss = null;
     this.spawnPoint = { x: 0, y: 0, z: 0, yaw: 0 };
     this.rand = rng(def.seed || 7);
@@ -96,12 +114,24 @@ export class Level {
     this.time = 0;
     this.sparkTotal = 0;
     this.mats = {};
+    const T0 = performance.now();
+    this.loadTimes = {};
     this.setupEnvironment();
     if (spec.build) spec.build(this);
     else if (spec.kind === 'kingdom') generateKingdom(this, spec);
     else generateLevel(this, spec);
     this.par = this.par || 60;
+    const T1 = performance.now();
+    M.refine(this.group);
+    const T2 = performance.now();
     this.bakeStatic();
+    const T3 = performance.now();
+    const gp = game.gfx && game.gfx.p;
+    if (gp && gp.modern && gp.grass && this.grassAreas.length) {
+      const areas = this.grassAreas.filter((a) => !a.mesh.userData.dyn);
+      this.grass = new Grass(this, areas, 14 * gp.grass, 30 + 12 * gp.grass);
+    }
+    this.loadTimes = { build: Math.round(T1 - T0), refine: Math.round(T2 - T1), bake: Math.round(T3 - T2), grass: Math.round(performance.now() - T3) };
     this.buildSparkInstances();
   }
 
@@ -198,6 +228,8 @@ export class Level {
         bottom: { value: new THREE.Color(th.skyBottom) }, sunDir: { value: sunDir }, sunCol: { value: new THREE.Color(th.sunColor || 0xfff2c0) },
         stars: { value: th.stars || 0 },
         linOut: { value: this.game.gfx && this.game.gfx.composer ? 1 : 0 },
+        clouds: { value: this.game.gfx && this.game.gfx.modern ? (th.skyClouds ?? 0.75) : 0 }, time: { value: 0 },
+        cloudCol: { value: new THREE.Color(th.cloudCol ?? 0xffffff) },
       },
     }));
     sky.renderOrder = -10;
@@ -206,7 +238,9 @@ export class Level {
     this.add(sky);
     const fogK = (this.game.gfx ? this.game.gfx.p.fog : 1) * (this.spec.kind === 'kingdom' ? 1.5 : 1);
     this.fog = new THREE.Fog(th.fog, th.fogNear * fogK, th.fogFar * fogK);
-    const hemi = new THREE.HemisphereLight(th.hemiSky, th.hemiGround, th.hemiI ?? 1.6);
+    const modern = this.game.gfx && this.game.gfx.modern;
+    // PC-Next-Gen: einen Teil des Himmelslichts übernimmt die Umgebungskarte (IBL)
+    const hemi = new THREE.HemisphereLight(th.hemiSky, th.hemiGround, (th.hemiI ?? 1.6) * (modern ? 0.55 : 1));
     this.add(hemi);
     const sun = new THREE.DirectionalLight(th.sunLight || 0xfff1d6, th.sunI ?? 2.6);
     sun.castShadow = true;
@@ -248,6 +282,7 @@ export class Level {
     m.position.set(x, top - h / 2, z);
     m.castShadow = true; m.receiveShadow = true;
     this.add(m); this.staticRoots.push(m);
+    if (GRASSY.has(o.mat || 'grass')) this.grassAreas.push({ kind: 'box', x, z, w, d, top, mesh: m });
     if (o.under !== false && !o.noUnder) {
       const uh = o.underH ?? Math.min(w, d) * 0.9;
       const ug = new THREE.CylinderGeometry(1, 0.12, uh, 4, 1);
@@ -273,6 +308,7 @@ export class Level {
     m.position.set(x, top - h / 2, z);
     m.castShadow = true; m.receiveShadow = true;
     this.add(m); this.staticRoots.push(m);
+    if (GRASSY.has(o.mat || 'grass')) this.grassAreas.push({ kind: 'cyl', x, z, r, top, mesh: m });
     if (o.under !== false) {
       const uh = o.underH ?? r * 1.4;
       const ug = new THREE.CylinderGeometry(r * 0.94, r * 0.15, uh, Math.max(8, Math.round(r * 4)));
@@ -373,7 +409,7 @@ export class Level {
   ghost(x, top, z, r) {
     const p = this.cyl(x, top, z, r, { mat: 'cloud', h: 0.5, under: false, noCam: true });
     p.mesh.userData.dyn = true;
-    const mat = new THREE.MeshToonMaterial({ color: 0xe8f0ff, emissive: 0x6a8aff, emissiveIntensity: 0.4, gradientMap: this.T.toonGradient, transparent: true, opacity: 0.0 });
+    const mat = M.surfaceMat({ color: 0xe8f0ff, emissive: 0x6a8aff, emissiveIntensity: 0.4, transparent: true, opacity: 0.0 }, { rough: 0.2 });
     p.mesh.material = mat; p.mesh.castShadow = false;
     this.ghosts.push({ ...p, mat, x, y: top, z, vis: 0 });
     return p;
@@ -1012,6 +1048,8 @@ export class Level {
   // visuelle Updates einmal pro Frame
   update(dt, player, camera) {
     const t = this.time;
+    if (this.grass) this.grass.update(dt, player, camera);
+    this.sky.material.uniforms.time.value = t;
     for (const s of this.sparks) if (!s.taken) s.pos.y = s.base + Math.sin(t * 2 + s.ph) * 0.12;
     this.updateSparkInstances(t);
     for (const h of this.hearts) if (!h.taken) { h.mesh.rotation.y = t * 1.5; h.pos.y = h.base + Math.sin(t * 2) * 0.15; }

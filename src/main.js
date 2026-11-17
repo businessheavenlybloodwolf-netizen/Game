@@ -1,7 +1,7 @@
 // LUMI und das Morgenlicht – Hauptspiel (offene Reiche + Herausforderungen)
 import * as THREE from 'three';
-import { createTextures, setTextureQuality, setAnisotropy } from './textures.js';
-import { setTextures, setBatching } from './models.js';
+import { createTextures, setTextureQuality, setAnisotropy, normalMapFor } from './textures.js';
+import { setTextures, setBatching, setModern, setNormalMapper, refine } from './models.js';
 import { GameAudio } from './audio.js';
 import { Input } from './input.js';
 import { Particles } from './particles.js';
@@ -44,6 +44,8 @@ class Game {
     setTextureQuality(PRESETS[preset].tex);
     setAnisotropy(PRESETS[preset].aniso);
     setBatching(true);
+    setModern(!!PRESETS[preset].modern);
+    setNormalMapper(normalMapFor);
     const canvas = document.getElementById('game');
     this.canvas = canvas;
     const renderer = this.renderer = new THREE.WebGLRenderer({ canvas, antialias: PRESETS[preset].aa !== false, powerPreference: 'high-performance' });
@@ -57,6 +59,7 @@ class Game {
     this.hud = new HUD(this.audio);
     this.particles = new Particles(this.scene, this.T);
     this.player = new Player(this);
+    refine(this.player.mesh);
     this.player.attach(this.scene);
     // Handy: Lumis Punktlicht kostet auf jeder Oberfläche Rechenzeit – dort weglassen (Flamme leuchtet trotzdem)
     if (PRESETS[preset].light === false) this.player.mesh.userData.light.visible = false;
@@ -200,6 +203,7 @@ class Game {
     this.level = new Level(this.spec(w, i), this);
     this.scene.add(this.level.group);
     this.scene.fog = this.level.fog;
+    this.gfx.setupEnvironment(this.level);
     const s = this.level.spawnPoint;
     this.checkpoint = { ...s };
     this.player.reset(s.x, s.y, s.z, Math.PI);
@@ -324,12 +328,12 @@ class Game {
 
   cycleGraphics(back) {
     const next = ORDER[(ORDER.indexOf(this.gfx.name) + 1) % ORDER.length];
-    const texChange = PRESETS[next].tex !== PRESETS[this.gfx.name].tex || PRESETS[next].batch !== PRESETS[this.gfx.name].batch;
+    const texChange = PRESETS[next].tex !== PRESETS[this.gfx.name].tex || PRESETS[next].batch !== PRESETS[this.gfx.name].batch || !!PRESETS[next].modern !== !!PRESETS[this.gfx.name].modern;
     this.gfx.scale = 1;
     savePreset(next);
     if (texChange) { this.writeSave(); location.reload(); return; }
     this.gfx.apply(next);
-    if (this.level) { this.gfx.setupSun(this.level.sun); this.level.sky.material.uniforms.linOut.value = this.gfx.composer ? 1 : 0; }
+    if (this.level) { this.gfx.setupSun(this.level.sun); this.level.sky.material.uniforms.linOut.value = this.gfx.composer ? 1 : 0; this.gfx.setupEnvironment(this.level); }
     back();
   }
 
@@ -939,6 +943,7 @@ class Game {
     L.updateSun(this.camTarget);
     this.hud.update(dt);
     this.particles.setView(this.camera, this.renderer);
+    this.gfx.update();
     this.gfx.render();
     this.gfx.adapt(dt);
     if (this.showFps && this.gfx.win.n === 0) {

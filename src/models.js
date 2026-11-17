@@ -6,14 +6,56 @@ let T = null;
 const matCache = new Map();
 export function setTextures(t) { T = t; }
 
+// PC-Next-Gen (Stufen Hoch/Ultra): physikalisch basierte Materialien mit Normal-Maps, Umgebungslicht und Spiegelungen.
+// Handy-Stufen behalten das klassische Toon-Shading.
+let MODERN = false;
+export function setModern(b) { MODERN = b; }
+export function isModern() { return MODERN; }
+// Oberflächen-Eigenschaften je gemalter Textur: [Rauheit, Metall, Normal-Stärke]
+const SURFACE = {
+  ice: [0.12, 0, 1.2], crystalTop: [0.28, 0.05, 2], crystalRock: [0.35, 0.05, 2.5], metal: [0.35, 0.75, 2],
+  water: [0.15, 0, 1], snow: [0.62, 0, 1.4], snowCliff: [0.7, 0, 2.5], wood: [0.72, 0, 2.5], darkWood: [0.72, 0, 2.5],
+  grass: [0.88, 0, 2.2], grassPlain: [0.88, 0, 2.2], dirt: [0.95, 0, 3], stone: [0.8, 0, 3.2], brick: [0.85, 0, 3.2],
+  brickTop: [0.8, 0, 3], towerCliff: [0.9, 0, 3], basalt: [0.75, 0, 3], basaltTop: [0.7, 0, 3], sand: [0.95, 0, 1.6],
+  sandstone: [0.85, 0, 3], sandTop: [0.85, 0, 2.6], coral: [0.6, 0, 2.5], seaRock: [0.7, 0, 3], clockTop: [0.6, 0.2, 2.6],
+  checker: [0.5, 0, 0.6], cloth: [0.95, 0, 1.5], clothRed: [0.95, 0, 1.5], cloudSea: [1, 0, 0], fog: [0.9, 0, 0.8], fogGray: [0.9, 0, 0.8],
+  lava: [0.5, 0, 2],
+};
+export function pbrMaterial(p, opts = {}) {
+  const name = p.map && p.map.userData ? p.map.userData.name : null;
+  const sf = SURFACE[name];
+  const glow = p.emissive && new THREE.Color(p.emissive).getHex() !== 0 && (p.emissiveIntensity ?? 1) > 0.25;
+  const m = new THREE.MeshStandardMaterial({
+    color: p.color, map: p.map || null,
+    emissive: p.emissive || 0x000000, emissiveIntensity: p.emissiveIntensity ?? 1,
+    transparent: !!p.transparent, opacity: p.opacity ?? 1,
+    // ohne Textur: weicher „Vinyl-Spielzeug“-Look; leuchtende Teile glänzen wie Glas/Edelstein
+    roughness: opts.rough ?? (sf ? sf[0] : glow ? 0.18 : 0.5),
+    metalness: opts.metal ?? (sf ? sf[1] : 0),
+  });
+  if (sf && sf[2] > 0 && p.map) {
+    const nm = NORMAL_FN && NORMAL_FN(p.map, sf[2]);
+    if (nm) { m.normalMap = nm; m.normalScale.set(1, 1); }
+  }
+  return m;
+}
+let NORMAL_FN = null;
+export function setNormalMapper(fn) { NORMAL_FN = fn; }
+// Ersatz für „new MeshToonMaterial({...})“: wählt je nach Grafikstufe Toon oder PBR
+export function surfaceMat(p, opts) {
+  if (MODERN) return pbrMaterial(p, opts);
+  return new THREE.MeshToonMaterial({ ...p, gradientMap: T.toonGradient });
+}
+
 export function toon(color, opts = {}) {
-  const key = JSON.stringify([color, opts.map ? opts.map.uuid : 0, opts.emissive || 0, opts.ei || 0, opts.transparent || 0, opts.opacity || 1]);
+  const key = JSON.stringify([color, opts.map ? opts.map.uuid : 0, opts.emissive || 0, opts.ei || 0, opts.transparent || 0, opts.opacity || 1, opts.rough ?? -1]);
   if (matCache.has(key) && !opts.unique) return matCache.get(key);
-  const m = new THREE.MeshToonMaterial({
-    color, map: opts.map || null, gradientMap: T.toonGradient,
+  const p = {
+    color, map: opts.map || null,
     emissive: opts.emissive || 0x000000, emissiveIntensity: opts.ei ?? 1,
     transparent: !!opts.transparent, opacity: opts.opacity ?? 1,
-  });
+  };
+  const m = MODERN ? pbrMaterial(p, opts) : new THREE.MeshToonMaterial({ ...p, gradientMap: T.toonGradient });
   if (!opts.unique) matCache.set(key, m);
   return m;
 }
@@ -28,7 +70,52 @@ const outlineMat = new THREE.MeshBasicMaterial({ color: 0x1a1020, side: THREE.Ba
 let BATCH = true;
 export function setBatching(b) { BATCH = b; }
 
+// PC-Next-Gen: runde Formen feiner unterteilen (glatte Silhouetten statt sichtbarer Kanten).
+// Absichtlich kantige Formen (Kristalle mit 4–7 Seiten) bleiben, wie sie sind.
+const refineCache = new Map();
+const CTORS = { SphereGeometry: THREE.SphereGeometry, CylinderGeometry: THREE.CylinderGeometry, ConeGeometry: THREE.ConeGeometry, TorusGeometry: THREE.TorusGeometry, CapsuleGeometry: THREE.CapsuleGeometry };
+function untouched(g) {
+  const C = CTORS[g.type];
+  const ref = new C(...Object.values(g.parameters));
+  const a = g.attributes.position.array, b = ref.attributes.position.array, ua = g.attributes.uv && g.attributes.uv.array, ub = ref.attributes.uv.array;
+  let ok = a.length === b.length;
+  for (const i of [0, 1, 2, a.length >> 1, (a.length >> 1) + 1, a.length - 1, a.length - 4]) if (ok && Math.abs(a[i] - b[i]) > 1e-4) ok = false;
+  if (ok && ua) for (const i of [0, 1, ua.length >> 1, ua.length - 1, ua.length - 3]) if (Math.abs(ua[i] - ub[i]) > 1e-4) ok = false;
+  ref.dispose();
+  return ok;
+}
+function refinedGeo(g) {
+  if (refineCache.has(g.uuid)) return refineCache.get(g.uuid);
+  const p = g.parameters || {};
+  let n = null;
+  if (g.type === 'SphereGeometry' && p.widthSegments < 32 && p.widthSegments >= 8) {
+    n = new THREE.SphereGeometry(p.radius, Math.max(32, p.widthSegments * 2), Math.max(20, p.heightSegments * 2), p.phiStart, p.phiLength, p.thetaStart, p.thetaLength);
+  } else if (g.type === 'CylinderGeometry' && p.radialSegments >= 8 && p.radialSegments < 28) {
+    n = new THREE.CylinderGeometry(p.radiusTop, p.radiusBottom, p.height, 28, p.heightSegments, p.openEnded, p.thetaStart, p.thetaLength);
+  } else if (g.type === 'ConeGeometry' && p.radialSegments >= 8 && p.radialSegments < 28) {
+    n = new THREE.ConeGeometry(p.radius, p.height, 28, p.heightSegments, p.openEnded, p.thetaStart, p.thetaLength);
+  } else if (g.type === 'TorusGeometry' && p.radialSegments >= 6 && p.tubularSegments < 48) {
+    n = new THREE.TorusGeometry(p.radius, p.tube, Math.max(12, p.radialSegments * 2), Math.max(48, p.tubularSegments * 2), p.arc);
+  } else if (g.type === 'CapsuleGeometry' && p.radialSegments < 20) {
+    n = new THREE.CapsuleGeometry(p.radius, p.length, Math.max(8, p.capSegments * 2), 20);
+  }
+  if (n && g.groups.length > 1) n = null; // Mehrfach-Materialien nicht anfassen
+  if (n && !untouched(g)) n = null;         // nachträglich verformte oder neu gemappte Geometrie behalten
+  refineCache.set(g.uuid, n);
+  return n;
+}
+export function refine(root) {
+  if (!MODERN) return root;
+  root.traverse((o) => {
+    if (!o.isMesh || o.isInstancedMesh || Array.isArray(o.material) || o.userData.noRefine) return;
+    const n = refinedGeo(o.geometry);
+    if (n) o.geometry = n;
+  });
+  return root;
+}
+
 export function compactGroup(group, skip = []) {
+  refine(group);
   if (!BATCH) return group;
   group.updateMatrixWorld(true);
   const inv = group.matrixWorld.clone().invert();
@@ -74,7 +161,7 @@ export function addOutline(obj, thickness = 0.04) {
   for (const o of list) {
     if (!o.geometry.boundingSphere) o.geometry.computeBoundingSphere();
     const r = o.geometry.boundingSphere.radius || 1;
-    const s = 1 + thickness / r;
+    const s = 1 + thickness * (MODERN ? 0.7 : 1) / r;
     const ol = new THREE.Mesh(o.geometry, outlineMat);
     ol.scale.setScalar(s);
     ol.userData.noOutline = true;
@@ -271,7 +358,7 @@ export function createBoss(cfg = {}) {
     }
   }
   // Morgenlicht-Kristall (Schwachstelle)
-  const gemM = new THREE.MeshToonMaterial({ color: 0xbff7ff, emissive: 0x55e0ff, emissiveIntensity: 1.2, gradientMap: T.toonGradient });
+  const gemM = surfaceMat({ color: 0xbff7ff, emissive: 0x55e0ff, emissiveIntensity: 1.2 }, { rough: 0.1, metal: 0.1 });
   const gem = mesh(new THREE.OctahedronGeometry(0.55), gemM, 0, 4.25, 0, body); gem.scale.set(0.8, 1.3, 0.8);
   const gemGlow = glowSprite(0x7fefff, 3.5, 0.8); gem.add(gemGlow);
   // Augen
@@ -346,7 +433,7 @@ export function createHeart() {
 
 export function createShard() {
   const root = new THREE.Group();
-  const gm = new THREE.MeshToonMaterial({ color: 0xd8fbff, emissive: 0x5fd8ff, emissiveIntensity: 1.0, gradientMap: T.toonGradient });
+  const gm = surfaceMat({ color: 0xd8fbff, emissive: 0x5fd8ff, emissiveIntensity: 1.0 }, { rough: 0.1, metal: 0.1 });
   const c = mesh(new THREE.OctahedronGeometry(0.6), gm, 0, 0, 0, root); c.scale.set(0.7, 1.4, 0.7);
   const c2 = mesh(new THREE.OctahedronGeometry(0.3), toon(0xfff3b0, { emissive: 0xffd36b, ei: 1 }), 0.35, -0.35, 0.1, root); c2.scale.set(0.6, 1.3, 0.6);
   addOutline(c, 0.04);
@@ -542,7 +629,7 @@ export function createMoonstone(collected = false) {
   s.absarc(0.28, 0, 0.42, Math.PI * 1.62, Math.PI * 0.38, true);
   const g = new THREE.ExtrudeGeometry(s, { depth: 0.16, bevelEnabled: true, bevelThickness: 0.06, bevelSize: 0.05, bevelSegments: 2, curveSegments: 20 });
   g.center();
-  const mat = new THREE.MeshToonMaterial({ color: collected ? 0x8a9ab8 : 0xd8e8ff, emissive: collected ? 0x203040 : 0x6a9aff, emissiveIntensity: 0.8, gradientMap: T.toonGradient, transparent: collected, opacity: collected ? 0.45 : 1 });
+  const mat = surfaceMat({ color: collected ? 0x8a9ab8 : 0xd8e8ff, emissive: collected ? 0x203040 : 0x6a9aff, emissiveIntensity: 0.8, transparent: collected, opacity: collected ? 0.45 : 1 }, { rough: 0.12, metal: 0.1 });
   const m = mesh(g, mat, 0, 0, 0, root);
   m.rotation.z = 0.3;
   if (!collected) addOutline(m, 0.04);

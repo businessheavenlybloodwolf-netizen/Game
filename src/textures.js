@@ -454,6 +454,7 @@ export function createTextures() {
     puff: toTexture(radial(64, [[0, 'rgba(255,255,255,0.9)'], [0.6, 'rgba(255,255,255,0.4)'], [1, 'rgba(255,255,255,0)']]), false),
     sparkle: toTexture(sparkle(), false),
   };
+  for (const k of Object.keys(T)) T[k].userData.name = k;
   // Toon-Verlauf
   const steps = new Uint8Array([90, 160, 225, 255]);
   const grad = new THREE.DataTexture(steps, steps.length, 1, THREE.RedFormat);
@@ -461,4 +462,43 @@ export function createTextures() {
   grad.needsUpdate = true;
   T.toonGradient = grad;
   return T;
+}
+
+// ---------- PC-Next-Gen: Normal-Maps aus den gemalten Texturen ----------
+// Höhe = Helligkeit (Fugen, Risse, Halme sind dunkel → liegen tiefer). Sobel-Filter mit Kachel-Umbruch.
+const normalCache = new Map();
+export function normalMapFor(tex, strength = 2.5) {
+  if (!tex || !tex.image || !tex.image.getContext) return null;
+  const key = tex.uuid + '|' + strength;
+  if (normalCache.has(key)) return normalCache.get(key);
+  const src = tex.image, W = src.width, H = src.height;
+  const d = src.getContext('2d').getImageData(0, 0, W, H).data;
+  const h = new Float32Array(W * H);
+  for (let i = 0; i < W * H; i++) h[i] = (d[i * 4] * 0.299 + d[i * 4 + 1] * 0.587 + d[i * 4 + 2] * 0.114) / 255;
+  // leicht weichzeichnen, damit es nicht rauscht
+  const hb = new Float32Array(W * H);
+  for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) {
+    let s = 0;
+    for (let oy = -1; oy <= 1; oy++) for (let ox = -1; ox <= 1; ox++) s += h[((y + oy + H) % H) * W + ((x + ox + W) % W)];
+    hb[y * W + x] = s / 9;
+  }
+  const c = document.createElement('canvas'); c.width = W; c.height = H;
+  const ctx = c.getContext('2d'), img = ctx.createImageData(W, H), o = img.data;
+  const k = strength * (W / 256);
+  const at = (x, y) => hb[((y + H) % H) * W + ((x + W) % W)];
+  for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) {
+    const dx = (at(x + 1, y - 1) + 2 * at(x + 1, y) + at(x + 1, y + 1)) - (at(x - 1, y - 1) + 2 * at(x - 1, y) + at(x - 1, y + 1));
+    const dy = (at(x - 1, y + 1) + 2 * at(x, y + 1) + at(x + 1, y + 1)) - (at(x - 1, y - 1) + 2 * at(x, y - 1) + at(x + 1, y - 1));
+    let nx = -dx * k, ny = dy * k, nz = 1;
+    const l = Math.hypot(nx, ny, nz); nx /= l; ny /= l; nz /= l;
+    const i = (y * W + x) * 4;
+    o[i] = (nx * 0.5 + 0.5) * 255; o[i + 1] = (ny * 0.5 + 0.5) * 255; o[i + 2] = (nz * 0.5 + 0.5) * 255; o[i + 3] = 255;
+  }
+  ctx.putImageData(img, 0, 0);
+  const t = new THREE.CanvasTexture(c);
+  t.colorSpace = THREE.NoColorSpace;
+  t.wrapS = tex.wrapS; t.wrapT = tex.wrapT; t.repeat.copy(tex.repeat); t.anisotropy = tex.anisotropy;
+  t.needsUpdate = true;
+  normalCache.set(key, t);
+  return t;
 }

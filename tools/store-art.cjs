@@ -37,8 +37,10 @@ const ART = [
   for (const [file, w, h, q] of ART) {
     if (only && !file.includes(only)) continue;
     const page = await browser.newPage({ viewport: { width: w, height: h } });
+    page.setDefaultTimeout(600000);
     await page.goto(`${game}?promo=1&lang=${lang}&${q}`);
-    await page.waitForTimeout(w > 2000 ? 9000 : 4500);
+    await page.waitForFunction(() => window.__lumi && window.__lumi.level, null, { timeout: 600000 });
+    await page.waitForTimeout(w > 2000 ? 12000 : 8000);
     fs.mkdirSync(path.dirname(path.join(out, file)), { recursive: true });
     await page.screenshot({ path: path.join(out, file), timeout: 300000 });
     await page.close();
