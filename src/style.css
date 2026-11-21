@@ -160,3 +160,13 @@ html, body { margin: 0; height: 100%; overflow: hidden; background: #1a1020; fon
 @keyframes savedFade { 0% { opacity: 0; } 15% { opacity: 1; } 75% { opacity: 1; } 100% { opacity: 0; } }
 
 #fps { position: fixed; left: 50%; top: 4px; transform: translateX(-50%); padding: 2px 10px; border-radius: 8px; background: rgba(0,0,0,.55); color: #9ff4a0; font: 700 13px/1.4 monospace; pointer-events: none; z-index: 50; }
+
+/* ---------- Cutscenes: Kinobalken, HUD aus ---------- */
+#cinebars { position: fixed; inset: 0; pointer-events: none; z-index: 4; }
+#cinebars i { position: absolute; left: 0; right: 0; height: 11vh; background: #07040c; transition: transform .7s cubic-bezier(.2,.8,.2,1); }
+#cinebars i:first-child { top: 0; transform: translateY(-100%); }
+#cinebars i:last-child { bottom: 0; transform: translateY(100%); }
+#cinebars.on i, body.cine-boss #cinebars i { transform: none; }
+body.cine #hud, body.cine-boss #hud > :not(#banner):not(#bossbar) { opacity: 0; transition: opacity .4s; }
+body.cine #touch { display: none !important; }
+#dialog { z-index: 5; }

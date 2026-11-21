@@ -21,6 +21,15 @@ alten Leuchtturm, in sieben Splitter zerschlagen und jedem seiner Nebelfürsten 
 Aus dem letzten Funken erwacht **Lumi**, ein kleiner Laternengeist. Die Stimme der Leuchtturmwärterin **Elva** führt Lumi durch acht Reiche. Mit ihrem alten Luftschiff **Leuchtfeder**,
 dessen Laterne nur mit **Mondsplittern** leuchtet, reist Lumi von Reich zu Reich.
 
+**Cutscenes:** Jede Textbox läuft zusammen mit einer Szene im Spiel, mit Kinobalken, Kamerafahrten und Effekten:
+- **Intro:** Rundflug über Lumeria. Graf Nebelmaul zerschlägt das Morgenlicht in sieben Splitter, die davonfliegen. Der Nebel steigt und die Welt wird grau. Ein Funke fliegt aus dem Leuchtturm, und Lumi erwacht.
+- **Ankunft in jedem Reich:** Rundflug über das neue Reich, Elva als tanzendes Licht im Wind, Blick auf das Nebeltor und auf die Leuchtfeder.
+- **Nach jedem Boss:** Lumi mit dem schwebenden Splitter, dann eine Kranfahrt, während die Welt wieder aufblüht.
+- **Ende:** Der Kern fliegt in den Leuchtturm, das Leuchtfeuer flammt auf, und Nebelmaul verweht als Morgendunst.
+- **Gespräche** mit den Glimmlingen als Zwei-Personen-Einstellung, dazu ein kurzer Kino-Auftritt jedes Bosses.
+
+Die **Leuchtfeder** ist ein richtiges Luftschiff: Bootsrumpf mit hochgezogenem Bug, Holzdeck, goldene Reling, leuchtende Bullaugen, Kajüte mit Schornstein, Federflügel, Ballon mit Spanten und Leitwerk, Propeller, Ruder, Laternenmast und eine leuchtende Feder als Galionsfigur.
+
 **Sprachen:** Deutsch, English, Français, Español, Italiano, Türkçe. Story, Menüs und Hinweise sind komplett übersetzt.
 Die Sprache wird automatisch erkannt und ist im Hauptmenü und im Pausenmenü umschaltbar.
 

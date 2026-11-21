@@ -10,6 +10,7 @@ import { Level } from './world.js';
 import { HANDMADE } from './levels.js';
 import { WORLDS, BOSS_IDX, BONUS_IDX } from './worlds.js';
 import { HUD } from './ui.js';
+import { Director } from './cutscene.js';
 import { Graphics, PRESETS, ORDER, loadPreset, savePreset } from './gfx.js';
 import { t, setLang, detectLang, LANGS, getLang } from './i18n/index.js';
 
@@ -58,6 +59,7 @@ class Game {
     this.input = new Input(canvas);
     this.hud = new HUD(this.audio);
     this.particles = new Particles(this.scene, this.T);
+    this.director = new Director(this);
     this.player = new Player(this);
     refine(this.player.mesh);
     this.player.attach(this.scene);
@@ -439,12 +441,16 @@ class Game {
     this.sparks = 0;
     this.state = 'story';
     this.audio.playMusic('title');
-    this.dialog(t('story.intro'), () => this.enterKingdom(0));
+    this.dialog(t('story.intro'), () => this.enterKingdom(0), 0, 'intro');
   }
 
-  dialog(lines, done, w = 0) {
+  // Textboxen laufen immer zusammen mit einer Cutscene (scene = Name der Szene in cutscene.js)
+  dialog(lines, done, w = 0, scene = null, opt = null) {
     const conv = (lines || []).map(([role, text]) => ({ role, text, who: role === 'b' ? t(`worlds.${w}.boss`) : t('story.who.' + role) }));
-    this.hud.dialog(conv, done);
+    if (scene && conv.length) {
+      this.director.start(scene, lines, w, opt);
+      this.hud.dialog(conv, () => { this.director.stop(); done && done(); }, (i) => this.director.next(i));
+    } else this.hud.dialog(conv, done);
   }
 
   // ---------------- Reiche (offene Welt) ----------------
@@ -477,7 +483,7 @@ class Game {
       this.state = 'story';
       this.hud.show(false);
       const lines = [...t(`story.before.${w}`), ...(w === 0 ? t('story.ship') : [])];
-      this.dialog(lines, () => { go(); this.hud.banner(t(`worlds.${w}.name`), t('ui.kingdom', { n: w + 1 })); }, w);
+      this.dialog(lines, () => { go(); this.hud.banner(t(`worlds.${w}.name`), t('ui.kingdom', { n: w + 1 })); }, w, 'arrive');
       return;
     }
     go();
@@ -493,7 +499,11 @@ class Game {
       return;
     }
     const npcName = t('npc.' + it.kind + 'Name');
-    const say = (key, after) => { this.state = 'story'; this.hud.dialog([{ role: 'e', who: npcName, text: t('npc.' + key, { n: SHOP_PRICE }) }], () => { this.state = 'play'; if (after) after(); }); };
+    const say = (key, after) => {
+      this.state = 'story';
+      this.director.start('talk', [['e', '']], w, new THREE.Vector3(it.x, it.y, it.z));
+      this.hud.dialog([{ role: 'e', who: npcName, text: t('npc.' + key, { n: SHOP_PRICE }) }], () => { this.director.stop(); this.state = 'play'; if (after) after(); }, (i) => this.director.next(i));
+    };
     const front = new THREE.Vector3(it.x + (this.player.pos.x - it.x) * 0.5, it.y + 2.2, it.z + (this.player.pos.z - it.z) * 0.5);
     if (it.kind === 'shop') {
       if (this.hasMoon(w, 'shop')) say('shopDone');
@@ -791,7 +801,7 @@ class Game {
             back();
             if (this.moonCount(w) >= TRAVEL_REQ[w]) this.hud.toast(t('ui.shipReady'), 3.5);
             else this.hud.toast(t('ui.needMoonsShip', { n: TRAVEL_REQ[w] }), 3.5);
-          }, w);
+          }, w, 'after');
         },
       });
     } else {
@@ -812,7 +822,6 @@ class Game {
     this.hud.show(false);
     this.lighthouseLit = true;
     this.loadLevel(0, 0);
-    this.player.mesh.visible = false;
     this.audio.playMusic('ending');
     this.dialog(t('story.ending'), () => {
       const all = this.moonCountAll() >= this.moonTotalAll();
@@ -823,7 +832,7 @@ class Game {
         body: `<p>${t('ui.endText')}</p><p>☾ ${this.moonCountAll()} / ${this.moonTotalAll()}</p>${all ? `<p>${t('ui.allMoonstones')}</p>` : `<p>${t('ui.keepSearching')}</p>`}<p class="credits">${t('ui.credits')}</p>`,
         items: [{ label: t('ui.continue'), action: () => this.enterKingdom(7) }, { label: t('ui.mainMenu'), action: () => { this.hud.hideMenu(); this.toTitle(); } }],
       });
-    });
+    }, 7, 'ending');
   }
 
   // Test-Helfer: simuliert einen Sprung von A nach B mit echter Physik (wird vom Level-Test genutzt)
@@ -938,6 +947,7 @@ class Game {
       L.update(dt, this.player, this.camera);
       this.particles.update(dt);
     }
+    this.director.update(dt);
     this.player.updateVisual(dt, L);
     this.updateCamera(dt);
     L.updateSun(this.camTarget);
@@ -987,6 +997,26 @@ class Game {
       cam.lookAt(p0.x, p0.y + pr.look, p0.z);
       return;
     }
+    if (this.director.active) { this.director.applyCamera(cam); return; }
+    // Boss-Auftritt: kurze Kino-Einstellung über Lumis Schulter auf den Boss
+    const boss = this.level && this.level.boss;
+    if (boss && boss.state === 'intro' && this.state === 'play') {
+      const bp = boss.mesh.getWorldPosition(this._dir);
+      const by = boss.cfg && boss.cfg.type === 'worm' ? boss.top + 4 : Math.max(boss.top + 2.5, bp.y + 2);
+      const fx = boss.center.x, fz = boss.center.z;
+      let dx = p.x - fx, dz = p.z - fz; const l = Math.hypot(dx, dz) || 1; dx /= l; dz /= l;
+      const k = Math.min(1, boss.t / 0.6);
+      const tx = p.x + dx * 5 - dz * 2, ty = p.y + 2.4, tz = p.z + dz * 5 + dx * 2;
+      cam.position.lerp(this._tgt.set(tx, ty, tz), 0.06 + k * 0.1);
+      if (!this._cineLook) this._cineLook = new THREE.Vector3();
+      if (boss.t < 0.05) this._cineLook.copy(this.camTarget);
+      this._cineLook.lerp(this._tgt.set(boss.cfg && boss.cfg.type === 'worm' ? fx : bp.x, by, boss.cfg && boss.cfg.type === 'worm' ? fz : bp.z), 0.12);
+      cam.lookAt(this._cineLook);
+      document.body.classList.add('cine-boss');
+      this.director.outT = 0.9; this.director.outPos.copy(cam.position); this.director.outLook.copy(this._cineLook);
+      return;
+    }
+    document.body.classList.remove('cine-boss');
     if (this.state === 'title' || this.state === 'ending' || (this.state === 'story' && !this.hud.el.hud.classList.contains('show'))) {
       const t = performance.now() / 1000;
       let c = this.level.spawnPoint, dist = 16, h = 5;
@@ -1027,6 +1057,7 @@ class Game {
       cam.position.x += (Math.random() - 0.5) * s; cam.position.y += (Math.random() - 0.5) * s; cam.position.z += (Math.random() - 0.5) * s;
     }
     cam.lookAt(this.camTarget);
+    this.director.blendOut(cam, dt);
   }
 }
 

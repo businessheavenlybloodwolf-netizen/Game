@@ -546,10 +546,11 @@ export class Level {
   unlockBonusPortal() { this.unlockPortal('bonus', this.game.challengeSub(this.spec.world, 6)); }
 
   ship(x, y, z, yaw) {
-    const a = M.createAirship(this.rand);
+    const a = M.createAirship(this.rand, true);
     a.position.set(x, y, z); a.rotation.y = yaw; a.scale.setScalar(2.6); this.add(a);
-    const lamp = new THREE.Mesh(new THREE.SphereGeometry(0.5, 14, 10), M.toon(0xfff1d6, { emissive: 0xffa040, ei: 0.8 }));
-    lamp.position.set(0, 2.2, 0); a.add(lamp); lamp.add(M.glowSprite(0xffb050, 3, 0.8));
+    // die Laterne der Leuchtfeder hängt am Bugmast
+    const lamp = new THREE.Mesh(new THREE.SphereGeometry(0.24, 16, 12), M.toon(0xfff1d6, { emissive: 0xffa040, ei: 0.9 }));
+    a.userData.lampAnchor.add(lamp); lamp.add(M.glowSprite(0xffb050, 1.8, 0.85));
     this.anim.push({ kind: 'ship', obj: a, base: y, ph: 0 });
     const it = { kind: 'ship', x: x, y: 0, z: z, r: 6, mesh: a };
     this.interactables.push(it);
@@ -1115,6 +1116,7 @@ export class Level {
       else if (a.kind === 'bob') { const dy = Math.sin(t * a.sp + a.ph) * a.amp; a.obj.position.y = a.base + dy; a.other.position.y = a.obase + dy; }
       else if (a.kind === 'drift') { a.obj.position.x += a.sp * dt; if (a.obj.position.x > a.x1) a.obj.position.x = a.x0; }
       else if (a.kind === 'spin') a.obj.rotation.z += a.sp * dt;
+      else if (a.kind === 'spin') a.obj.rotation.y = t * 0.8;
       else if (a.kind === 'npc') { const b = a.obj.userData.body; b.position.y = Math.abs(Math.sin(t * 3 + a.ph)) * 0.08; b.rotation.z = Math.sin(t * 1.5 + a.ph) * 0.08; }
       else if (a.kind === 'ship') { a.obj.position.y = a.base + Math.sin(t * 0.6 + a.ph) * 0.8; a.obj.userData.prop.rotation.x = t * 12; a.obj.rotation.z = Math.sin(t * 0.5 + a.ph) * 0.04; }
     }

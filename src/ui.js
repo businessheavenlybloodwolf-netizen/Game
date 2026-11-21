@@ -162,9 +162,9 @@ export class HUD {
   }
 
   // ---------- Dialoge ----------
-  dialog(lines, onDone) {
+  dialog(lines, onDone, onLine = null) {
     if (!lines || !lines.length) { onDone && onDone(); return; }
-    this.dlgLines = lines.slice(); this.dlgDone = onDone;
+    this.dlgLines = lines.slice(); this.dlgDone = onDone; this.dlgOnLine = onLine; this.dlgIdx = -1;
     this.el.dialog.classList.add('show');
     this.nextLine();
   }
@@ -175,6 +175,8 @@ export class HUD {
     this.el.dialog.dataset.who = l.role || l.who;
     this.el.dialog.querySelector('.text').textContent = '';
     this.dlg = { full: l.text, t: 0, shown: 0, done: false };
+    this.dlgIdx++;
+    if (this.dlgOnLine) this.dlgOnLine(this.dlgIdx);
   }
   advanceDialog() {
     if (!this.dlg) return;

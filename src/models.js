@@ -566,21 +566,173 @@ export function createCrate() {
   return m;
 }
 
-export function createAirship(rand) {
+// ---------------- Luftschiffe ----------------
+// Bootsrumpf als eigene Geometrie: spitzer, hochgezogener Bug, runderes Heck, gewölbter Kiel
+function hullGeometry(L, W, D) {
+  const nU = 28, nA = 14, pos = [], uv = [], idx = [];
+  const shape = (u) => {
+    const s = u * 2 - 1;
+    const w = W * Math.pow(Math.max(0, 1 - Math.pow(Math.abs(s), s > 0 ? 2.2 : 3.6)), 0.55);
+    const d = D * (0.55 + 0.45 * (1 - s * s));
+    const sheer = 0.22 * s * s + (s > 0 ? 0.3 * s * s * s : 0);
+    return { x: s * L / 2, w, d, sheer };
+  };
+  for (let i = 0; i <= nU; i++) {
+    const h = shape(i / nU);
+    for (let j = 0; j <= nA; j++) {
+      const a = j / nA * Math.PI;
+      pos.push(h.x, h.sheer - h.d * Math.pow(Math.sin(a), 0.85), h.w * Math.cos(a));
+      uv.push(h.x / 1.2, j / nA * 2.2);
+    }
+  }
+  for (let i = 0; i < nU; i++) for (let j = 0; j < nA; j++) {
+    const a = i * (nA + 1) + j, b = a + nA + 1;
+    idx.push(a, a + 1, b, b, a + 1, b + 1);
+  }
+  const g = new THREE.BufferGeometry();
+  g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+  g.setAttribute('uv', new THREE.Float32BufferAttribute(uv, 2));
+  g.setIndex(idx);
+  g.computeVertexNormals();
+  // Wicklung prüfen: Kielmitte muss nach unten zeigen
+  const mid = (nU >> 1) * (nA + 1) + (nA >> 1);
+  if (g.attributes.normal.getY(mid) > 0) { for (let k = 0; k < idx.length; k += 3) { const t = idx[k]; idx[k] = idx[k + 1]; idx[k + 1] = t; } g.setIndex(idx); g.computeVertexNormals(); }
+  // Deck
+  const dp = [], du = [], di = [];
+  for (let i = 0; i <= nU; i++) {
+    const h = shape(i / nU);
+    dp.push(h.x, h.sheer - 0.05, h.w * 0.97, h.x, h.sheer - 0.05, -h.w * 0.97);
+    du.push(h.x / 1.1, h.w * 0.97 / 1.1, h.x / 1.1, -h.w * 0.97 / 1.1);
+    if (i < nU) { const a = i * 2; di.push(a, a + 2, a + 1, a + 1, a + 2, a + 3); }
+  }
+  const deck = new THREE.BufferGeometry();
+  deck.setAttribute('position', new THREE.Float32BufferAttribute(dp, 3));
+  deck.setAttribute('uv', new THREE.Float32BufferAttribute(du, 2));
+  deck.setIndex(di);
+  deck.computeVertexNormals();
+  if (deck.attributes.normal.getY(2) < 0) { for (let k = 0; k < di.length; k += 3) { const t = di[k]; di[k] = di[k + 1]; di[k + 1] = t; } deck.setIndex(di); deck.computeVertexNormals(); }
+  return { hull: g, deck, shape };
+}
+
+// Stab zwischen zwei Punkten (Seile, Streben)
+function rod(a, b, r, mat, parent) {
+  const d = new THREE.Vector3().subVectors(b, a), len = d.length();
+  const m = new THREE.Mesh(new THREE.CylinderGeometry(r, r, len, 6), mat);
+  m.position.copy(a).addScaledVector(d, 0.5);
+  m.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), d.normalize());
+  m.castShadow = false;
+  parent.add(m);
+  return m;
+}
+
+function fin(points, depth, mat) {
+  const sh = new THREE.Shape();
+  sh.moveTo(points[0][0], points[0][1]);
+  for (let i = 1; i < points.length; i++) sh.lineTo(points[i][0], points[i][1]);
+  sh.closePath();
+  const g = new THREE.ExtrudeGeometry(sh, { depth, bevelEnabled: true, bevelThickness: 0.02, bevelSize: 0.02, bevelSegments: 1 });
+  g.translate(0, 0, -depth / 2);
+  const m = new THREE.Mesh(g, mat); m.castShadow = true;
+  return m;
+}
+
+// Luftschiff mit Bootsrumpf, Deck, Reling, Bullaugen, Kajüte, Federflügeln, Ballon mit Spanten und Leitwerk.
+// hero = die „Leuchtfeder“: zusätzlich Laternenmast am Bug (userData.lampAnchor) und eine leuchtende Feder als Galionsfigur.
+export function createAirship(rand, hero = false) {
   const root = new THREE.Group();
-  const bal = mesh(new THREE.SphereGeometry(1, 20, 14), toon(0xffffff, { map: rand() < 0.5 ? T.clothRed : T.cloth }), 0, 3, 0, root);
-  bal.scale.set(3.2, 1.6, 1.6);
-  const hull = mesh(new THREE.BoxGeometry(3, 0.8, 1.2), toon(0x9a6438, { map: T.wood }), 0, 0.6, 0, root);
-  for (const sx of [-1, 1]) {
-    const rope = mesh(new THREE.CylinderGeometry(0.03, 0.03, 1.6, 4), toon(0x3a2614), sx * 1.2, 1.6, 0, root); rope.castShadow = false;
+  const wood = toon(0xffffff, { map: T.wood }), dark = toon(0x8a5a3a, { map: T.darkWood });
+  const gold = toon(0xe8c070, { rough: 0.3, metal: 0.85 }), ropeM = toon(0x5a3a22);
+  const glass = toon(0xfff1c0, { emissive: 0xffb040, ei: 0.9 });
+  const clothMap = hero ? T.clothRed : (rand() < 0.5 ? T.clothRed : T.cloth);
+  const cloth = toon(0xffffff, { map: clothMap }), sail = toon(0xfff6e8, { map: T.cloth });
+  const L = 3.8, W = 0.78, D = 0.95, DY = 0.95;
+  const { hull, deck, shape } = hullGeometry(L, W, D);
+  const ship = new THREE.Group(); ship.position.y = DY; root.add(ship);
+  const hm = new THREE.Mesh(hull, dark); hm.castShadow = true; ship.add(hm);
+  const dm = new THREE.Mesh(deck, wood); dm.receiveShadow = true; ship.add(dm);
+  const at = (u) => shape(u);
+  // Reling, Zierleiste und Pfosten
+  for (const sd of [1, -1]) {
+    const rail = [], trim = [];
+    for (let i = 2; i <= 26; i++) { const h = at(i / 28); rail.push(new THREE.Vector3(h.x, h.sheer + 0.32, sd * h.w * 0.96)); trim.push(new THREE.Vector3(h.x, h.sheer - 0.1, sd * h.w * 1.01)); }
+    const rm = new THREE.Mesh(new THREE.TubeGeometry(new THREE.CatmullRomCurve3(rail), 40, 0.035, 6), gold); ship.add(rm);
+    const tm = new THREE.Mesh(new THREE.TubeGeometry(new THREE.CatmullRomCurve3(trim), 40, 0.045, 6), gold); ship.add(tm);
+    for (let i = 3; i <= 25; i += 3) { const h = at(i / 28); rod(new THREE.Vector3(h.x, h.sheer - 0.04, sd * h.w * 0.96), new THREE.Vector3(h.x, h.sheer + 0.32, sd * h.w * 0.96), 0.025, wood, ship); }
+    // Bullaugen
+    for (const u of [0.32, 0.45, 0.58, 0.7]) {
+      const h = at(u);
+      const ph = new THREE.Mesh(new THREE.CylinderGeometry(0.09, 0.09, 0.06, 14), glass);
+      ph.rotation.x = Math.PI / 2; ph.position.set(h.x, h.sheer - 0.36, sd * h.w * 0.9); ship.add(ph);
+      const ring = new THREE.Mesh(new THREE.TorusGeometry(0.1, 0.022, 6, 16), gold); ring.position.copy(ph.position); ring.position.z += sd * 0.03; ship.add(ring);
+    }
+    // Federflügel an den Seiten
+    // Federflügel: vier Federn fächern seitlich nach außen und leicht nach oben
+    const wing = new THREE.Group(); wing.position.set(0.2, -0.05, sd * (W - 0.02)); wing.rotation.x = sd * -0.3; ship.add(wing);
+    for (let k = 0; k < 4; k++) {
+      const f = new THREE.Mesh(new THREE.SphereGeometry(1, 16, 10), k % 2 ? sail : cloth);
+      const len = 0.62 - k * 0.08;
+      f.scale.set(0.15, 0.03, len);
+      f.position.set(-k * 0.2 - Math.sin(0.35 + k * 0.22) * len, 0, sd * Math.cos(0.35 + k * 0.22) * len);
+      f.rotation.y = sd * (0.35 + k * 0.22);
+      f.castShadow = true; wing.add(f);
+    }
   }
-  const prop = new THREE.Group(); prop.position.set(-1.7, 0.7, 0); root.add(prop);
+  // Kajüte am Heck mit Dach, Fenster und Schornstein
+  const hk = at(0.3);
+  const cab = new THREE.Mesh(new THREE.BoxGeometry(0.95, 0.55, 0.9), wood); cab.position.set(hk.x + 0.1, hk.sheer + 0.22, 0); cab.castShadow = true; ship.add(cab);
+  const roof = fin([[-0.62, 0], [0.62, 0], [0, 0.38]], 1.05, toon(0xb84a3a)); roof.rotation.y = 0;
+  roof.position.set(hk.x + 0.1, hk.sheer + 0.5, 0); ship.add(roof);
+  for (const sd of [1, -1]) { const win = new THREE.Mesh(new THREE.CircleGeometry(0.12, 16), glass); win.position.set(hk.x + 0.1, hk.sheer + 0.26, sd * 0.452); if (sd < 0) win.rotation.y = Math.PI; ship.add(win); }
+  const chim = new THREE.Mesh(new THREE.CylinderGeometry(0.07, 0.09, 0.45, 10), gold); chim.position.set(hk.x - 0.15, hk.sheer + 0.85, 0.2); ship.add(chim);
+  // Heck: Ruder und Propeller
+  const st = at(0.02);
+  const rud = fin([[0, 0], [-0.45, 0.05], [-0.5, -0.55], [-0.05, -0.45]], 0.05, dark); rud.position.set(st.x + 0.15, st.sheer - 0.15, 0); ship.add(rud);
+  const prop = new THREE.Group(); prop.position.set(-L / 2 - 0.25, DY + st.sheer - 0.2, 0); root.add(prop);
+  const hub = new THREE.Mesh(new THREE.SphereGeometry(0.12, 14, 10), gold); prop.add(hub);
   for (let i = 0; i < 3; i++) {
-    const p = mesh(new THREE.BoxGeometry(0.06, 0.9, 0.18), toon(0xe2b75e), 0, 0, 0, prop); p.rotation.x = i / 3 * Math.PI * 2;
+    const bl = new THREE.Mesh(new THREE.SphereGeometry(1, 14, 8), wood); bl.scale.set(0.05, 0.42, 0.13);
+    const arm = new THREE.Group(); arm.rotation.x = i / 3 * Math.PI * 2; bl.position.y = 0.42; bl.rotation.y = 0.5; arm.add(bl); prop.add(arm);
   }
-  addOutline(root, 0.05);
-  compactGroup(root, [prop]);
-  root.userData = { prop };
+  rod(new THREE.Vector3(-L / 2 + 0.2, DY + st.sheer - 0.2, 0), new THREE.Vector3(-L / 2 - 0.25, DY + st.sheer - 0.2, 0), 0.04, gold, root);
+  // Bug: Galionsfigur – eine leuchtende Feder
+  const bw = at(0.985);
+  const feather = new THREE.Group(); feather.position.set(bw.x + 0.05, bw.sheer + 0.05, 0); feather.rotation.z = -0.9; ship.add(feather);
+  const fq = new THREE.Mesh(new THREE.SphereGeometry(1, 16, 10), hero ? toon(0xffe8a0, { emissive: 0xffb040, ei: 0.6 }) : gold);
+  fq.scale.set(0.12, 0.55, 0.05); fq.position.y = 0.45; feather.add(fq);
+  rod(new THREE.Vector3(0, -0.05, 0), new THREE.Vector3(0, 0.95, 0), 0.018, gold, feather);
+  // Ballon mit Spanten, Bugkappe und Leitwerk
+  const EY = 3.55, ER = 1.3, EL = 3.1;
+  const env = new THREE.Mesh(new THREE.SphereGeometry(1, 32, 20), cloth); env.scale.set(EL, ER, ER); env.position.y = EY; env.castShadow = true; root.add(env);
+  const band = toon(0x5a3424);
+  for (const x of [-1.9, -0.65, 0.65, 1.9]) {
+    const r = ER * Math.sqrt(Math.max(0, 1 - (x / EL) ** 2)) + 0.015;
+    const t = new THREE.Mesh(new THREE.TorusGeometry(r, 0.035, 6, 36), band); t.rotation.y = Math.PI / 2; t.position.set(x, EY, 0); root.add(t);
+  }
+  const tip = new THREE.Mesh(new THREE.SphereGeometry(0.16, 14, 10), gold); tip.position.set(EL - 0.04, EY, 0); root.add(tip);
+  const finTop = fin([[0, 0], [-0.9, 0], [-1.15, 0.85], [-0.55, 0.85]], 0.06, sail);
+  finTop.position.set(-EL + 0.75, EY + ER * 0.55, 0); root.add(finTop);
+  for (const sd of [1, -1]) {
+    const f = fin([[0, 0], [-0.9, 0], [-1.15, 0.75], [-0.55, 0.75]], 0.06, sail);
+    f.position.set(-EL + 0.75, EY, sd * ER * 0.55); f.rotation.x = sd * Math.PI / 2; root.add(f);
+  }
+  // Takelage: Seile vom Ballon zum Deck
+  for (const x of [-1.5, -0.5, 0.6, 1.4]) {
+    const u = (x / L) + 0.5, h = at(Math.min(0.97, Math.max(0.03, u)));
+    const ry = EY - ER * Math.sqrt(Math.max(0, 1 - (x / EL) ** 2)) * 0.92;
+    for (const sd of [1, -1]) rod(new THREE.Vector3(x, ry, sd * 0.45), new THREE.Vector3(h.x, DY + h.sheer + 0.3, sd * h.w * 0.9), 0.018, ropeM, root);
+  }
+  // Leuchtfeder: Laternenmast am Bug
+  let lampAnchor = null;
+  if (hero) {
+    const mh = at(0.78);
+    rod(new THREE.Vector3(mh.x, DY + mh.sheer - 0.05, 0), new THREE.Vector3(mh.x, DY + mh.sheer + 1.25, 0), 0.05, gold, root);
+    const arm = rod(new THREE.Vector3(mh.x, DY + mh.sheer + 1.2, 0), new THREE.Vector3(mh.x + 0.45, DY + mh.sheer + 1.2, 0), 0.03, gold, root); void arm;
+    const cap = new THREE.Mesh(new THREE.ConeGeometry(0.22, 0.2, 12), gold); cap.position.set(mh.x + 0.45, DY + mh.sheer + 1.08, 0); root.add(cap);
+    lampAnchor = new THREE.Group(); lampAnchor.position.set(mh.x + 0.45, DY + mh.sheer + 0.82, 0); root.add(lampAnchor);
+  }
+  addOutline(root, 0.035);
+  compactGroup(root, lampAnchor ? [prop, lampAnchor] : [prop]);
+  root.userData = { prop, lampAnchor };
   return root;
 }
 
