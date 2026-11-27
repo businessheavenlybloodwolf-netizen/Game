@@ -50,7 +50,36 @@ Jeder Boss hat ein eigenes Modell, eigene Angriffe und eine eigene Schwachstelle
 
 ### Offene Welt
 
-Jede Welt ist ein frei begehbares **Reich**:
+Jede Welt ist ein frei begehbares **Reich**, eine **große, zusammenhängende Landschaft**, keine schwebenden Inseln mehr:
+- Das Gelände hat Hügel und Bergrücken entlang der Wege, und ein Gebirgsring am Horizont bildet die Weltgrenze. Jede Welt hat ihren eigenen Boden:
+
+  | Welt | Boden |
+  |---|---|
+  | Blütenwiesen | Wiese mit 3D-Gras |
+  | Kristallschlucht | Kristall |
+  | Wolkenwerft | Wolkenhügel |
+  | Glutvulkan | Basalt |
+  | Frostgipfel | Schnee |
+  | Sonnenruinen | Sanddünen |
+  | Korallentiefe | Meeresboden |
+  | Nebelreich | Pflaster |
+
+- Wälder, Palmen, Tannen, Korallen und Steine sind über die ganze Landschaft verteilt. Man kann überall hinlaufen, zu steile Hänge bremsen.
+- **Umgebung je Welt** mit jeweils eigener Deko, großen Wahrzeichen als Orientierungspunkte und schwebenden Partikeln:
+
+  | Welt | Deko | Wahrzeichen | Partikel |
+  |---|---|---|---|
+  | Blütenwiesen | Büsche mit Beeren, Blumenwiesen, Pilze, Zäune | Riesenbaum, Windmühle mit drehenden Flügeln | Glühwürmchen |
+  | Kristallschlucht | leuchtende Pilze, Kristallspitzen | Kristalltürme | Kristallfunken |
+  | Wolkenwerft | Wolkenbausche, Zäune | Ballon-Türme, Windmühle | Glitzern |
+  | Glutvulkan | rauchende Schlote mit Funkenflug, tote Bäume | Vulkane | Glut |
+  | Frostgipfel | Schneehaufen, Eiszapfen | Eisbögen | Schneefall |
+  | Sonnenruinen | Kakteen, Ruinensäulen | Pyramiden | Sandstaub |
+  | Korallentiefe | Seetang, Muscheln, leuchtende Pilze | Schiffswracks | Blasen |
+  | Nebelreich | Laternen, Zahnräder, tote Bäume | Uhrtürme | Nebelschwaden |
+- Alle Plattformen stehen als **Felssäulen und Tafelberge** auf dem Boden. Wer von einem Weg fällt, landet einfach in der Landschaft.
+- Die Herausforderungen liegen in **Senken mit Wasser, Lava, Treibsand oder Nebel** (je nach Welt). Wer dort hineinfällt, startet am letzten Checkpoint neu.
+  Boss-Arenen und Bonus-Level liegen ebenfalls in solchen Seen inmitten einer Landschaft.
 - In der Mitte liegt eine **Hub-Insel** mit dem Luftschiff **Leuchtfeder**, der Händlerin, einem Glimmling, der sein Kuscheltier vermisst,
   dem **Nebeltor** zum Boss und einem goldenen **Bonustor**.
 - Vom Hub führen **5 lange Inselketten** in alle Richtungen, jede mit zwei Arenen, und sie enden an einem **Gipfel**.
@@ -183,6 +212,8 @@ node tools/store-art.cjs   # Store-Grafiken nach ./store
 | `src/gfx.js` | Grafikstufen, Bloom, 4K |
 | `src/levels.js` | handgebaute Level |
 | `src/quests.js` | Quest-System: 8 Quest-Arten, Auftraggeber, Ziele, Quest-Log |
+| `src/terrain.js` | Landschaft: Höhenfeld, Seen, Gebirgsring, triplanare Bodentexturen |
+| `src/env.js` | Umgebung je Welt: Deko-Sets und Wahrzeichen |
 | `src/shapes.js` | runde Grundformen (Plattformen, Felsen, abgerundete Quader) |
 | `src/cutscene.js` | Cutscene-Regie zu allen Textboxen |
 | `src/boss.js` | 8 eigenständige Bosse (gemeinsame Basis + eigene Angriffe und Schwachstellen) |

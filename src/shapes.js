@@ -129,3 +129,32 @@ export function pebble(r, seed = 1) {
   g.computeVertexNormals();
   return g;
 }
+
+// Felssäule unter einer Plattform bis zum Boden: leicht verbeult, unten breiter auslaufend. Oben (y = 0) Radius r, unten bei y = -h.
+export function pillar(r, h, seed = 1, tile = 4) {
+  const seg = Math.max(20, Math.min(48, Math.round(r * 7)));
+  const rings = Math.max(3, Math.round(h / 2.2));
+  const pos = [], uv = [], idx = [];
+  const S = seg + 1;
+  for (let i = 0; i <= rings; i++) {
+    const t = i / rings, y = -h * t;
+    const flare = 1 + Math.pow(t, 3) * 0.35;
+    for (let j = 0; j <= seg; j++) {
+      const a = j / seg * Math.PI * 2;
+      const n = i === 0 ? 0 : (Math.sin(a * 3 + seed + y * 0.3) * 0.5 + Math.sin(a * 7 + seed * 1.7 - y * 0.5) * 0.3) * 0.07;
+      const rr = r * 0.96 * flare * (1 + n);
+      pos.push(Math.cos(a) * rr, y, Math.sin(a) * rr);
+      uv.push(a * r / tile, y / tile);
+    }
+  }
+  for (let i = 0; i < rings; i++) for (let j = 0; j < seg; j++) { const a = i * S + j, b = a + S; idx.push(a, a + 1, b, a + 1, b + 1, b); }
+  const g = new THREE.BufferGeometry();
+  g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+  g.setAttribute('uv', new THREE.Float32BufferAttribute(uv, 2));
+  g.setIndex(idx);
+  g.computeVertexNormals();
+  const nr = g.attributes.normal;
+  for (let i = 0; i <= rings; i++) { const a = i * S, b = i * S + seg; const x = (nr.getX(a) + nr.getX(b)) / 2, y = (nr.getY(a) + nr.getY(b)) / 2, z = (nr.getZ(a) + nr.getZ(b)) / 2; nr.setXYZ(a, x, y, z); nr.setXYZ(b, x, y, z); }
+  fixWinding(g, Math.floor(idx.length / 6));
+  return g;
+}

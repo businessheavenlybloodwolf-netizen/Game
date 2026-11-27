@@ -95,7 +95,8 @@ class BossBase {
   orb(o) {
     const L = this.level, g = this.game;
     const start = o.from.clone(), target = o.target.clone();
-    const gy = groundBelow(L.colliders, target.x, target.y + 6, target.z);
+    let gy = groundBelow(L.colliders, target.x, target.y + 6, target.z);
+    if (L.terrain) { const th = L.terrain.height(target.x, target.z); if (th <= target.y + 6) gy = Math.max(gy, th); }
     target.y = gy > -1e9 ? gy : this.top;
     const T = o.time ?? 1.2, grav = o.grav ?? -18, size = o.size ?? 0.55, blast = o.blast ?? 1.2;
     const vel = new THREE.Vector3((target.x - start.x) / T, (target.y - start.y) / T - 0.5 * grav * T, (target.z - start.z) / T);

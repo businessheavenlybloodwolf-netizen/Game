@@ -70,7 +70,7 @@ function paint(size, fn) {
   const S = Math.round(size * Q);
   const c = document.createElement('canvas');
   c.width = c.height = S;
-  const ctx = c.getContext('2d');
+  const ctx = c.getContext('2d', { willReadFrequently: true });
   const img = ctx.createImageData(S, S);
   for (let y = 0; y < S; y++) {
     for (let x = 0; x < S; x++) {
@@ -392,7 +392,7 @@ function water() {
 function radial(size, stops) {
   const c = document.createElement('canvas');
   c.width = c.height = size;
-  const ctx = c.getContext('2d');
+  const ctx = c.getContext('2d', { willReadFrequently: true });
   const g = ctx.createRadialGradient(size / 2, size / 2, 0, size / 2, size / 2, size / 2);
   for (const [o, col] of stops) g.addColorStop(o, col);
   ctx.fillStyle = g; ctx.fillRect(0, 0, size, size);
@@ -402,7 +402,7 @@ function radial(size, stops) {
 function sparkle() {
   const s = 64, c = document.createElement('canvas');
   c.width = c.height = s;
-  const ctx = c.getContext('2d');
+  const ctx = c.getContext('2d', { willReadFrequently: true });
   const g = ctx.createRadialGradient(32, 32, 0, 32, 32, 32);
   g.addColorStop(0, 'rgba(255,255,255,1)'); g.addColorStop(0.2, 'rgba(255,240,180,0.8)'); g.addColorStop(1, 'rgba(255,200,80,0)');
   ctx.fillStyle = g;
@@ -472,7 +472,7 @@ export function normalMapFor(tex, strength = 2.5) {
   const key = tex.uuid + '|' + strength;
   if (normalCache.has(key)) return normalCache.get(key);
   const src = tex.image, W = src.width, H = src.height;
-  const d = src.getContext('2d').getImageData(0, 0, W, H).data;
+  const d = src.getContext('2d', { willReadFrequently: true }).getImageData(0, 0, W, H).data;
   const h = new Float32Array(W * H);
   for (let i = 0; i < W * H; i++) h[i] = (d[i * 4] * 0.299 + d[i * 4 + 1] * 0.587 + d[i * 4 + 2] * 0.114) / 255;
   // leicht weichzeichnen, damit es nicht rauscht
@@ -483,7 +483,7 @@ export function normalMapFor(tex, strength = 2.5) {
     hb[y * W + x] = s / 9;
   }
   const c = document.createElement('canvas'); c.width = W; c.height = H;
-  const ctx = c.getContext('2d'), img = ctx.createImageData(W, H), o = img.data;
+  const ctx = c.getContext('2d', { willReadFrequently: true }), img = ctx.createImageData(W, H), o = img.data;
   const k = strength * (W / 256);
   const at = (x, y) => hb[((y + H) % H) * W + ((x + W) % W)];
   for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) {

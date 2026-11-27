@@ -171,6 +171,13 @@ export class Player {
         }
       }
     }
+    // Gelände
+    const TR = level.terrain;
+    if (TR) {
+      const th = TR.height(this.pos.x, this.pos.z);
+      if (this.pos.y <= th + 0.001 && this.vel.y <= 0.01 && (!landed || th >= landed.maxY)) { this.pos.y = th; TR.col.maxY = th; landed = TR.col; }
+      else if (this.pos.y < th) this.pos.y = th;
+    }
     if (landed) {
       const impact = this.vel.y;
       this.grounded = true; this.ground = landed;
@@ -201,6 +208,7 @@ export class Player {
     }
 
     // ---- Horizontale Bewegung ----
+    const ox = this.pos.x, oz = this.pos.z;
     this.pos.x += this.vel.x * dt;
     this.pos.z += this.vel.z * dt;
     for (const c of cols) {
@@ -215,6 +223,20 @@ export class Player {
       }
     }
 
+    // Gelände: Hänge hinauf- und hinunterlaufen, zu steile Hänge bremsen, Weltgrenze
+    if (TR) {
+      TR.clampBound(this.pos);
+      const th = TR.height(this.pos.x, this.pos.z);
+      if (th > this.pos.y + 0.001) {
+        const d = Math.hypot(this.pos.x - ox, this.pos.z - oz);
+        const climb = th - Math.max(this.pos.y, TR.height(ox, oz));
+        if (d > 1e-5 && climb / d > 1.25 && th - this.pos.y > 0.25) { this.pos.x = ox; this.pos.z = oz; this.vel.x *= 0.3; this.vel.z *= 0.3; }
+        else this.pos.y = th;
+      } else if (this.grounded && this.ground === TR.col && this.vel.y <= 0 && this.pos.y - th < 0.55) {
+        this.pos.y = th; // am Boden kleben, wenn es bergab geht
+      }
+      if (this.ground === TR.col) TR.col.maxY = this.pos.y;
+    }
     if (this.pos.y < level.killY && this.alive) this.game.onPlayerFell();
   }
 
@@ -264,7 +286,8 @@ export class Player {
     u.tail.rotation.y = Math.sin(level.time * 7) * 0.2;
     u.light.intensity = 5 + Math.sin(level.time * 20) * 0.8;
     // Schatten-Marker
-    const gy = groundBelow(level.colliders, this.pos.x, this.pos.y + 0.05, this.pos.z, 0.05);
+    let gy = groundBelow(level.colliders, this.pos.x, this.pos.y + 0.05, this.pos.z, 0.05);
+    if (level.terrain) gy = Math.max(gy, level.terrain.height(this.pos.x, this.pos.z));
     if (gy > -1e8 && this.alive) {
       this.shadow.visible = true;
       this.shadow.position.set(this.pos.x, gy + 0.03, this.pos.z);

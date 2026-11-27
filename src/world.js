@@ -10,6 +10,8 @@ import { generateLevel, generateKingdom } from './generator.js';
 import { Grass } from './grass.js';
 import * as SH from './shapes.js';
 import { QuestSystem } from './quests.js';
+import { Terrain, fbm as tfbm } from './terrain.js';
+import { decorateWorld } from './env.js';
 
 const SURF = {
   grass: ['grass', 'dirt'], meadow: ['grassPlain', 'dirt'], stone: ['stone', 'stone'],
@@ -110,6 +112,7 @@ export class Level {
     this.crates = []; this.anim = []; this.projectiles = [];
     this.grassAreas = []; this.grass = null;
     this.courses = []; this.courseTag = null;
+    this.platRecs = []; this.terrain = null; this.vents = [];
     this.goal = null; this.boss = null;
     this.spawnPoint = { x: 0, y: 0, z: 0, yaw: 0 };
     this.rand = rng(def.seed || 7);
@@ -121,10 +124,14 @@ export class Level {
     const T0 = performance.now();
     this.loadTimes = {};
     this.setupEnvironment();
+    const Ta = performance.now();
     if (spec.build) spec.build(this);
     else if (spec.kind === 'kingdom') generateKingdom(this, spec);
     else generateLevel(this, spec);
     this.par = this.par || 60;
+    const Tb = performance.now();
+    this.buildTerrain();
+    this.genTimes = { env: Math.round(Ta - T0), gen: Math.round(Tb - Ta) };
     const T1 = performance.now();
     M.refine(this.group);
     const T2 = performance.now();
@@ -253,7 +260,7 @@ export class Level {
     sun.shadow.bias = -0.0008; sun.shadow.normalBias = 0.03;
     if (this.game.gfx) this.game.gfx.setupSun(sun);
     this.sun = sun; this.add(sun); this.add(sun.target);
-    if (th.lavaY !== undefined) {
+    if (th.lavaY !== undefined && false) {
       const tex = this.T.lava.clone(); tex.needsUpdate = true; tex.repeat.set(80, 80);
       const lava = new THREE.Mesh(new THREE.PlaneGeometry(3000, 3000), new THREE.MeshBasicMaterial({ map: tex }));
       lava.rotation.x = -Math.PI / 2; lava.position.y = th.lavaY;
@@ -261,7 +268,7 @@ export class Level {
       this.killY = th.lavaY - 0.5;
     }
     // Wolkenmeer
-    if (th.sea) {
+    if (th.sea && false) {
       const tex = this.T[th.sea].clone(); tex.needsUpdate = true;
       tex.repeat.set(60, 60);
       const sea = new THREE.Mesh(new THREE.PlaneGeometry(3000, 3000), new THREE.MeshBasicMaterial({ map: tex, color: th.seaTint || 0xffffff }));
@@ -287,15 +294,18 @@ export class Level {
     m.castShadow = true; m.receiveShadow = true;
     this.add(m); this.staticRoots.push(m);
     if (GRASSY.has(o.mat || 'grass')) this.grassAreas.push({ kind: 'box', x, z, w: w - 0.5, d: d - 0.5, top, mesh: m });
+    const rec = { kind: 'box', x, z, r: Math.hypot(w, d) / 2, w, d, top, h, mesh: m, col: null, under: null, mat: s, course: this.courseTag };
+    this.platRecs.push(rec);
     if (o.under !== false && !o.noUnder) {
       const uh = o.underH ?? Math.min(w, d) * 0.9;
       const ug = SH.rockUnder(1, uh, x * 0.37 + z * 0.71, 32, 4 / Math.max(w, d) * 2);
       const um = new THREE.Mesh(ug, s.side);
       um.scale.set(w * 0.47, 1, d * 0.47);
       um.position.set(x, top - h, z);
-      this.add(um); this.staticRoots.push(um);
+      this.add(um); this.staticRoots.push(um); rec.under = um;
     }
     const c = boxCollider(x - w / 2, top - h, z - d / 2, x + w / 2, top, z + d / 2, { mesh: m, ice: !!o.ice });
+    rec.col = c;
     if (!o.noCollide) this.colliders.push(c);
     if (!o.noCam) this.cameraMeshes.push(m);
     if (o.decor) this.scatter(c, o.decor);
@@ -312,15 +322,18 @@ export class Level {
     m.castShadow = true; m.receiveShadow = true;
     this.add(m); this.staticRoots.push(m);
     if (GRASSY.has(o.mat || 'grass')) this.grassAreas.push({ kind: 'cyl', x, z, r: r - bevel + 0.05, top, mesh: m });
+    const rec = { kind: 'cyl', x, z, r, top, h, mesh: m, col: null, under: null, mat: s, course: this.courseTag };
+    this.platRecs.push(rec);
     if (o.under !== false) {
       // organischer Fels unter der Insel statt Kegel
       const uh = o.underH ?? r * 1.4;
       const ug = SH.rockUnder(r * 0.94, uh, x * 0.37 + z * 0.71, Math.max(24, Math.round(r * 6)));
       const um = new THREE.Mesh(ug, s.side);
       um.position.set(x, top - h, z);
-      this.add(um); this.staticRoots.push(um);
+      this.add(um); this.staticRoots.push(um); rec.under = um;
     }
     const c = cylCollider(x, z, r, top - h, top, { mesh: m, ice: !!o.ice });
+    rec.col = c;
     if (!o.noCollide) this.colliders.push(c);
     if (!o.noCam) this.cameraMeshes.push(m);
     if (o.decor) this.scatter(c, o.decor);
@@ -583,6 +596,156 @@ export class Level {
   }
 
   link(a, b, o = {}) { this.links.push({ a, b, o }); }
+  addCollider(x, z, r, y0, y1) { this.colliders.push(cylCollider(x, z, r, y0, y1)); }
+
+  // ---------------- Große Landschaft statt Inseln ----------------
+  buildTerrain() {
+    const tT0 = performance.now();
+    const kingdom = this.spec.kind === 'kingdom';
+    const recs = this.platRecs;
+    if (!recs.length) return;
+    const wid = this.worldDef.id;
+    const seed = (this.spec.seed || 7) % 997;
+    let minX = 1e9, maxX = -1e9, minZ = 1e9, maxZ = -1e9, far = 0;
+    for (const r of recs) { minX = Math.min(minX, r.x - r.r); maxX = Math.max(maxX, r.x + r.r); minZ = Math.min(minZ, r.z - r.r); maxZ = Math.max(maxZ, r.z + r.r); far = Math.max(far, Math.hypot(r.x, r.z) + r.r); }
+    let T, edge;
+    if (kingdom) {
+      const Rw = far + 36;
+      T = new Terrain({ minX: -Rw - 90, maxX: Rw + 90, minZ: -Rw - 90, maxZ: Rw + 90, cell: 2, seed, bound: { cx: 0, cz: 0, r: Rw }, ice: wid === 'ice' && false });
+      edge = (x, z) => Math.hypot(x, z) - (Rw - 6);
+    } else {
+      const M = 40;
+      T = new Terrain({ minX: minX - M - 80, maxX: maxX + M + 80, minZ: minZ - M - 80, maxZ: maxZ + M + 80, cell: 2, seed, bound: { minX: minX - M, maxX: maxX + M, minZ: minZ - M, maxZ: maxZ + M } });
+      edge = (x, z) => Math.max(minX - M - x, x - maxX - M, minZ - M - z, z - maxZ - M, -40) + 6;
+    }
+    // Grundform: Hügel, am Rand ein Gebirgsring
+    T.base((x, z) => {
+      // Gebirge erst hinter der Weltgrenze: sanft ansteigende Ausläufer, weiter draußen hohe Gipfel
+      const e = Math.max(0, edge(x, z)) / 80;
+      const hills = -2.2 + tfbm(x / 70, z / 70, seed, 4) * 4.5 + tfbm(x / 19, z / 19, seed + 3, 3) * 1.6;
+      const ridge = 0.6 + 0.8 * tfbm(x / 34, z / 34, seed + 9, 4);
+      return hills + Math.pow(Math.min(1.2, e), 1.7) * 58 * ridge;
+    });
+    // Gefahren-Senken: Herausforderungen im Reich, in Einzel-Levels alles
+    const regions = new Map();
+    for (const r of recs) {
+      const key = kingdom ? r.course : 'all';
+      if (key === null || key === undefined) continue;
+      if (!regions.has(key)) regions.set(key, { recs: [], minX: 1e9, maxX: -1e9, minZ: 1e9, maxZ: -1e9, level: 1e9 });
+      const g = regions.get(key);
+      g.recs.push(r); g.level = Math.min(g.level, r.top - 3.6);
+      g.minX = Math.min(g.minX, r.x - r.r - 3); g.maxX = Math.max(g.maxX, r.x + r.r + 3); g.minZ = Math.min(g.minZ, r.z - r.r - 3); g.maxZ = Math.max(g.maxZ, r.z + r.r + 3);
+    }
+    const inRegion = (g, x, z, m = 0) => x > g.minX - m && x < g.maxX + m && z > g.minZ - m && z < g.maxZ + m;
+    // Bergrücken unter den Inselketten (die Wege steigen mit dem Gelände an)
+    if (kingdom) for (const r of recs) if (r.course === null || r.course === undefined) T.liftCircle(r.x, r.z, r.r, r.top - 7.5, 0.33, 26);
+    // Uferland rund um die Senken: folgt der Strecke (organische Form), damit das Wasser nur in der Senke steht
+    for (const g of regions.values()) {
+      g.mask = new Uint8Array(T.nx * T.nz);
+      const R0 = 15, fall = 20;
+      const mark = (cx, cz, rad) => T.raster(cx, cz, rad + R0 + fall, 'max', (x, z) => {
+        const d = Math.hypot(x - cx, z - cz) - rad;
+        if (d <= R0) { const i = Math.round((x - T.minX) / T.cell), j = Math.round((z - T.minZ) / T.cell); g.mask[T.idx(i, j)] = 1; return g.level + 0.8; }
+        return d < R0 + fall ? g.level + 0.8 - (d - R0) * 0.45 : undefined;
+      });
+      for (const r of g.recs) mark(r.x, r.z, r.r);
+      for (const l of this.links) {
+        const [ax, , az] = l.a, [bx, , bz] = l.b;
+        if (!inRegion(g, ax, az) || !inRegion(g, bx, bz)) continue;
+        const n = Math.max(1, Math.ceil(Math.hypot(bx - ax, bz - az) / 3));
+        for (let k = 0; k <= n; k++) mark(ax + (bx - ax) * k / n, az + (bz - az) * k / n, 1);
+      }
+    }
+    // Plattformen und Sprungwege freihalten (begehbare Hänge)
+    for (const r of recs) {
+      const hz = kingdom ? (r.course !== null && r.course !== undefined) : true;
+      if (hz) continue;
+      T.capCircle(r.x, r.z, r.r + 0.6, r.top - 1.2, 0.6, 26);
+    }
+    for (const l of this.links) {
+      const [ax, ay, az] = l.a, [bx, by, bz] = l.b;
+      let hzr = null;
+      for (const g of regions.values()) if (inRegion(g, ax, az) && inRegion(g, bx, bz)) { hzr = g; break; }
+      if (hzr) T.capSegment(ax, az, bx, bz, 2.6, hzr.level - 2.6, 0.6, 18);
+      else T.capSegment(ax, az, bx, bz, 1.6, Math.min(ay, by) - 2.0, 0.6, 18);
+    }
+    for (const g of regions.values()) for (const r of g.recs) T.capCircle(r.x, r.z, r.r + 2.6, g.level - 2.6, 0.6, 18);
+    for (const g of regions.values()) T.hazards.push({ level: g.level, mask: g.mask, minX: g.minX - 18, maxX: g.maxX + 18, minZ: g.minZ - 18, maxZ: g.maxZ + 18 });
+    this.terrain = T;
+    const tT1 = performance.now();
+    // Gelände-Mesh und Senken-Füllung
+    const mesh = T.buildMesh(this.T, wid);
+    this.add(mesh);
+    this.hazardMeshes = T.hazardMeshes(this.T, wid);
+    for (const hm of this.hazardMeshes) this.add(hm);
+    // Plattformen auf den Boden stellen: Felssäulen statt schwebender Inseln
+    for (const r of recs) {
+      if (r.mesh.userData.dyn) continue;
+      let ground = T.height(r.x, r.z);
+      for (let k = 0; k < 8; k++) { const a = k / 8 * Math.PI * 2; ground = Math.min(ground, T.height(r.x + Math.cos(a) * r.r * 0.85, r.z + Math.sin(a) * r.r * 0.85)); }
+      const bottom = r.top - r.h;
+      if (r.under) { r.under.parent && r.under.parent.remove(r.under); const si = this.staticRoots.indexOf(r.under); if (si >= 0) this.staticRoots.splice(si, 1); r.under = null; }
+      if (ground < bottom - 0.2) {
+        const ph = bottom - ground + 1.5;
+        const geo = r.kind === 'cyl' ? SH.pillar(r.r, ph, r.x * 0.31 + r.z * 0.57) : SH.pillar(1, ph, r.x * 0.31 + r.z * 0.57);
+        const pm = new THREE.Mesh(geo, r.mat.side);
+        if (r.kind === 'box') pm.scale.set(r.w * 0.48, 1, r.d * 0.48);
+        pm.position.set(r.x, bottom + 0.05, r.z);
+        pm.castShadow = true; pm.receiveShadow = true;
+        this.add(pm); this.staticRoots.push(pm);
+        if (r.col) r.col.minY = ground - 1.5;
+      }
+    }
+    // Landschaft beleben: Bäume, Steine, Blumen, Gras
+    const tT2 = performance.now();
+    this.decorateTerrain(kingdom);
+    this.terrainTimes = { raster: Math.round(tT1 - tT0), mesh: Math.round(tT2 - tT1), decor: Math.round(performance.now() - tT2) };
+    this.killY = -1e6;
+  }
+
+  decorateTerrain(kingdom) {
+    const T = this.terrain, S = this.def, rnd = this.rand;
+    const b = T.bound;
+    const area = b.r ? Math.PI * b.r * b.r : (b.maxX - b.minX) * (b.maxZ - b.minZ);
+    const near = (x, z, m) => this.platRecs.some((r) => Math.hypot(r.x - x, r.z - z) < r.r + m);
+    const ok = (x, z, m = 3) => {
+      const y = T.height(x, z);
+      if (T.slope(x, z) > 0.55) return null;
+      if (T.hazardAt(x, y - 0.1, z)) return null;
+      if (near(x, z, m)) return null;
+      return y;
+    };
+    const rand = () => {
+      if (b.r) { const a = rnd() * Math.PI * 2, rr = Math.sqrt(rnd()) * (b.r - 6); return [Math.cos(a) * rr, Math.sin(a) * rr]; }
+      return [b.minX + rnd() * (b.maxX - b.minX), b.minZ + rnd() * (b.maxZ - b.minZ)];
+    };
+    const trees = Math.min(240, Math.round(area / 520)), rocks = Math.min(120, Math.round(area / 1100));
+    const kinds = S.trees && S.trees.length ? S.trees : null;
+    for (let i = 0; i < trees && kinds; i++) {
+      const [x, z] = rand(); const y = ok(x, z, 3); if (y === null) continue;
+      this.tree(x, y - 0.05, z, kinds[Math.floor(rnd() * kinds.length)]);
+    }
+    for (let i = 0; i < rocks; i++) { const [x, z] = rand(); const y = ok(x, z, 2); if (y === null) continue; this.rock(x, y, z); }
+    // Welt-Deko (Büsche, Blumen, Pilze, Kakteen, Seetang …) und große Wahrzeichen
+    const place = (m, landmark = false) => {
+      for (let k = 0; k < 12; k++) {
+        const [x, z] = rand();
+        if (landmark && (Math.hypot(x, z) < 40 || (b.r && Math.hypot(x, z) > b.r - 25))) continue;
+        if (landmark && T.slope(x, z) > 0.3) continue;
+        const y = ok(x, z, m);
+        if (y !== null) return { x, y, z };
+      }
+      return null;
+    };
+    decorateWorld(this, place, rnd, area, kingdom);
+    // Gras auf Wiesen-Welten: Flecken rund um den Hub und verstreut
+    if (S.big === 'grass' || S.big === 'meadow') {
+      const patches = [];
+      if (kingdom) patches.push({ x: 0, z: 0, r: 46 });
+      for (let i = 0; i < 26; i++) { const [x, z] = rand(); patches.push({ x, z, r: 9 + rnd() * 10 }); }
+      for (const p of patches) this.grassAreas.push({ kind: 'terrain', x: p.x, z: p.z, r: p.r, mesh: { userData: {} } });
+    }
+  }
 
   // ---------------- Herausforderungen direkt in der offenen Welt ----------------
   courseBegin(k) { this.courseTag = k; this.courses[k] = { k, sparkTotal: 0, got: 0, gate: null, goal: null, par: 60, done: false }; return this.courses[k]; }
@@ -956,6 +1119,8 @@ export class Level {
     const pc = _pc.set(p.x, p.y + 0.6, p.z);
     // Crumble-Auslöser
     for (const cr of this.crumbles) if (cr.state === 'idle' && player.grounded && player.ground === cr.col) { cr.state = 'shaking'; cr.t = 0; }
+    // Senke mit Wasser/Lava/Nebel
+    if (this.terrain && player.alive && this.terrain.hazardAt(p.x, p.y, p.z)) { g.onPlayerFell(); return; }
     // Start-Tore der Herausforderungen
     for (const c of this.courses) {
       if (!c || !c.gate) continue;
@@ -1116,6 +1281,7 @@ export class Level {
   update(dt, player, camera) {
     const t = this.time;
     if (this.grass) this.grass.update(dt, player, camera);
+    if (this.hazardMeshes) for (const hm of this.hazardMeshes) { const f = hm.userData.flow; f.offset.x += dt * (hm.userData.lava ? 0.012 : 0.006); f.offset.y += dt * 0.004; }
     if (this.quests && this.game.state !== 'test') this.quests.update(dt, player);
     this.sky.material.uniforms.time.value = t;
     for (const s of this.sparks) if (!s.taken) s.pos.y = s.base + Math.sin(t * 2 + s.ph) * 0.12;
@@ -1139,6 +1305,21 @@ export class Level {
     if (this.seaTex) { const k = this.lavaFlow ? 3 : 1; this.seaTex.offset.x += dt * 0.004 * k; this.seaTex.offset.y += dt * 0.002 * k; }
     const th = this.def.theme;
     const fxRate = this.game.particles.rate ?? 1;
+    // Rauch und Funken aus Vulkanschloten in Lumis Nähe
+    for (const v of this.vents) {
+      const dx = v.x - player.pos.x, dz = v.z - player.pos.z;
+      if (dx * dx + dz * dz > (v.big ? 160 * 160 : 60 * 60)) continue;
+      if (Math.random() < dt * (v.big ? 18 : 3) * fxRate) this.game.particles.burst(new THREE.Vector3(v.x + (Math.random() - 0.5) * (v.big ? 3 : 0.4), v.y, v.z + (Math.random() - 0.5) * (v.big ? 3 : 0.4)), { count: 1, color: [0x5a4a4a, 0x8a6a5a], speed: v.big ? 1.5 : 0.4, size: v.big ? 4 : 1.2, gravity: v.big ? 3 : 1.5, life: v.big ? 5 : 2.5, drag: 0.2, grow: 2.5, opacity: 0.55 });
+      if (Math.random() < dt * (v.big ? 8 : 1.5) * fxRate) this.game.particles.burst(new THREE.Vector3(v.x, v.y, v.z), { count: 1, color: [0xffb02e, 0xff6a1a], speed: v.big ? 6 : 2, up: 3, size: 0.3, tex: 'sparkle', additive: true, gravity: -6, life: 1.4 });
+    }
+    // Umgebungs-Partikel je Welt (Glühwürmchen, Funken, Staub, Nebel …)
+    const AMB = { meadow: [0xfff6a0, 'glow', 0.25, 0.4], crystal: [0x9ff4ff, 'sparkle', 0.35, 0.3], lava: [0xffa040, 'sparkle', 0.3, 1.2], desert: [0xffe0a0, 'puff', 0.6, 0.6], fog: [0xb8a0ff, 'puff', 1.6, 0.25], sky: [0xffffff, 'sparkle', 0.25, 0.3] };
+    const amb = this.terrain && AMB[this.worldDef.id];
+    if (amb && Math.random() < dt * 14 * fxRate) {
+      const p = player.pos, a = Math.random() * Math.PI * 2, rr = 4 + Math.random() * 22;
+      const x = p.x + Math.cos(a) * rr, z = p.z + Math.sin(a) * rr, y = this.terrain.height(x, z) + 0.5 + Math.random() * 3;
+      this.game.particles.burst(new THREE.Vector3(x, y, z), { count: 1, color: amb[0], speed: amb[3], up: 0.3, size: amb[2], tex: amb[1], additive: amb[1] !== 'puff', gravity: this.worldDef.id === 'lava' ? 0.8 : 0.05, life: 3.5, drag: 0.3, opacity: amb[1] === 'puff' ? 0.35 : 0.9 });
+    }
     if ((th.snow || th.bubbles) && Math.random() < dt * 25 * fxRate) {
       const p = player.pos;
       const pos = new THREE.Vector3(p.x + (Math.random() - 0.5) * 30, p.y + (th.snow ? 12 : -6), p.z + (Math.random() - 0.5) * 30);
@@ -1184,6 +1365,7 @@ export class Level {
       else if (a.kind === 'drift') { a.obj.position.x += a.sp * dt; if (a.obj.position.x > a.x1) a.obj.position.x = a.x0; }
       else if (a.kind === 'spin') a.obj.rotation.z += a.sp * dt;
       else if (a.kind === 'spin') a.obj.rotation.y = t * 0.8;
+      else if (a.kind === 'windmill') a.obj.rotation.z = t * 0.9;
       else if (a.kind === 'npc') { const b = a.obj.userData.body; b.position.y = Math.abs(Math.sin(t * 3 + a.ph)) * 0.08; b.rotation.z = Math.sin(t * 1.5 + a.ph) * 0.08; }
       else if (a.kind === 'ship') { a.obj.position.y = a.base + Math.sin(t * 0.6 + a.ph) * 0.8; a.obj.userData.prop.rotation.x = t * 12; a.obj.rotation.z = Math.sin(t * 0.5 + a.ph) * 0.04; }
     }

@@ -77,14 +77,21 @@ export class Grass {
     let total = 0;
     const MAX = 420000;
     for (const a of areas) {
-      const area = a.kind === 'cyl' ? Math.PI * a.r * a.r : a.w * a.d;
+      const area = a.kind === 'cyl' || a.kind === 'terrain' ? Math.PI * a.r * a.r : a.w * a.d;
       let n = Math.round(area * density);
       if (total + n > MAX) n = MAX - total;
       if (n <= 0) break;
       total += n;
       for (let i = 0; i < n; i++) {
-        let x, z;
-        if (a.kind === 'cyl') {
+        let x, z, y = a.top - 0.02;
+        if (a.kind === 'terrain') {
+          const rr = a.r * Math.sqrt(r()), aa = r() * Math.PI * 2;
+          x = a.x + Math.cos(aa) * rr; z = a.z + Math.sin(aa) * rr;
+          const T = level.terrain;
+          if (!T) continue;
+          y = T.height(x, z) - 0.03;
+          if (T.slope(x, z) > 0.7 || T.hazardAt(x, y + 0.1, z)) continue;
+        } else if (a.kind === 'cyl') {
           const rr = (a.r - 0.25) * Math.sqrt(r()), aa = r() * Math.PI * 2;
           x = a.x + Math.cos(aa) * rr; z = a.z + Math.sin(aa) * rr;
         } else {
@@ -96,7 +103,7 @@ export class Grass {
         e.set((r() - 0.5) * 0.35, r() * Math.PI * 2, (r() - 0.5) * 0.35);
         q.setFromEuler(e);
         s.set(0.8 + r() * 0.6, h, 1);
-        p.set(x, a.top - 0.02, z);
+        p.set(x, y, z);
         m4.compose(p, q, s);
         cA.setHSL(0, 0, 0.82 + r() * 0.3);
         if (r() < 0.12) cA.multiply(new THREE.Color(1.1, 1.05, 0.7)); // trockene Halme

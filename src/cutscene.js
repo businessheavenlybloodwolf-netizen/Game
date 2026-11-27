@@ -231,11 +231,14 @@ export class Director {
     };
     // ferner Leuchtturm auf eigener Felsinsel hinter der Hub-Insel
     const lhPos = V(0, 6, -46);
+    const TR = this.L.terrain;
+    if (TR) lhPos.y = TR.height(lhPos.x, lhPos.z) + 0.6; // der Leuchtturm steht auf dem Boden der Landschaft
     const rock = new THREE.Mesh(new THREE.CylinderGeometry(6, 1.2, 9, 14), M.toon(0xffffff, { map: g.T.dirt }));
     rock.position.set(lhPos.x, lhPos.y - 4.5, lhPos.z);
     const top = new THREE.Mesh(new THREE.CylinderGeometry(6.2, 6, 1, 18), M.toon(0xffffff, { map: g.T.grass }));
     top.position.set(lhPos.x, lhPos.y - 0.5, lhPos.z);
     const lh = M.createLighthouse(); lh.position.copy(lhPos); lh.scale.setScalar(1.1);
+    if (TR) { rock.position.y = lhPos.y - 4.5; top.position.y = lhPos.y - 0.5; rock.scale.y = 0.15; rock.position.y = lhPos.y - 0.9; }
     this.props.add(rock, top, lh);
     const lampPos = lhPos.clone().add(V(0, 11.9 * 1.1, 0));
     // Morgenlicht über der Insel

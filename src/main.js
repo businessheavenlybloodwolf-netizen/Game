@@ -1108,6 +1108,8 @@ class Game {
       const s = this.shakeT * 0.6;
       cam.position.x += (Math.random() - 0.5) * s; cam.position.y += (Math.random() - 0.5) * s; cam.position.z += (Math.random() - 0.5) * s;
     }
+    // Kamera nie unter das Gelände
+    if (this.level.terrain) { const th = this.level.terrain.height(cam.position.x, cam.position.z) + 0.6; if (cam.position.y < th) cam.position.y = th; }
     cam.lookAt(this.camTarget);
     this.director.blendOut(cam, dt);
   }

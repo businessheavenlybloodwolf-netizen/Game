@@ -719,18 +719,10 @@ export function generateLevel(L, spec) {
 
   // ---------------- Kulisse ----------------
   if (kind === 'kingdom') {
-    for (let i = 0; i < 10; i++) {
-      const a = i / 10 * Math.PI * 2 + r() * 0.4, rr = R(280, 360);
-      L.distantIsland(Math.cos(a) * rr, R(-15, 35), Math.sin(a) * rr, R(9, 16), { mat: S.big, kind: S.islandKind, trees: 4 + Math.floor(r() * 4) });
-    }
-    L.clouds(30, 0, 0, 700, -28, -10, W.theme.cloud, W.id === 'coral' ? 0.5 : 0.9);
+    // keine schwebenden Hintergrund-Inseln mehr: das Reich ist eine zusammenhängende Landschaft (Wolken nur am Himmel)
+    L.clouds(18, 0, 0, 700, 45, 90, W.theme.cloud, W.id === 'coral' ? 0.5 : 0.9);
   } else {
-    const islands = 4 + Math.floor(r() * 3);
-    for (let i = 0; i < islands; i++) {
-      const side = i % 2 ? 1 : -1;
-      L.distantIsland(side * R(35, 60), R(-10, 25), -i * 25 + R(-10, 10), R(6, 12), { mat: S.big, kind: S.islandKind, trees: 3 + Math.floor(r() * 3) });
-    }
-    L.clouds(10, 0, -60, 240, -25, -10, W.theme.cloud, W.id === 'coral' ? 0.5 : 0.9);
+    L.clouds(8, 0, -60, 300, 45, 80, W.theme.cloud, W.id === 'coral' ? 0.5 : 0.9);
   }
   if (S.ships) for (let i = 0; i < (kind === 'kingdom' ? 8 : 4); i++) L.airship(R(-40, 40) * (kind === 'kingdom' ? 3 : 1), R(15, 45), kind === 'kingdom' ? R(-120, 120) : -i * 35 - 20, r() * 6);
   if (S.gears) for (let i = 0; i < (kind === 'kingdom' ? 12 : 6); i++) L.gear(R(-50, 50) + (i % 2 ? 30 : -30) * (kind === 'kingdom' ? 3 : 1), R(-10, 30), kind === 'kingdom' ? R(-140, 140) : -i * 25, R(4, 9), (r() - 0.5) * 0.6, r() * 3);
