@@ -1,0 +1,6 @@
+{
+  "name": "Phasmophobia",
+  "fps": 10,
+  "bar": null,
+  "grey": { "event": "death", "saturationBelow": 0.06, "minBrightShare": 0.05, "holdMs": 2000 }
+}

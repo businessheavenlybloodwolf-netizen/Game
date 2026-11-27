@@ -9,6 +9,7 @@ export class Engine {
     this.log = log;
     this.pulses = [];
     this.health = null; // 0..1 oder null, wenn unbekannt
+    this.levels = new Map(); // dauerhafte Stärken, z. B. VRChat-Kontakte (Schlüssel -> 0..1)
     this.last = -1;
     this.timer = setInterval(() => this.tick(), 50);
   }
@@ -36,6 +37,16 @@ export class Engine {
     this.health = frac == null ? null : clamp(frac);
   }
 
+  // Dauerhafte Stärke einer Quelle setzen (0 entfernt sie).
+  setLevel(key, value) {
+    const v = clamp(Number(value) || 0);
+    if (v > 0) this.levels.set(key, v); else this.levels.delete(key);
+  }
+
+  clearLevels(prefix = '') {
+    for (const k of this.levels.keys()) if (k.startsWith(prefix)) this.levels.delete(k);
+  }
+
   level(now) {
     let max = 0, sum = 0;
     this.pulses = this.pulses.filter((p) => {
@@ -49,6 +60,7 @@ export class Engine {
     });
     // Mehrere Treffer kurz hintereinander verstärken sich leicht.
     let v = clamp(max + 0.3 * (sum - max));
+    for (const l of this.levels.values()) v = Math.max(v, l);
 
     const lh = this.cfg.lowHealth;
     if (lh?.enabled && this.health != null && this.health > 0 && this.health < lh.threshold) {
@@ -71,6 +83,7 @@ export class Engine {
   stop() {
     clearInterval(this.timer);
     this.pulses = [];
+    this.levels.clear();
     this.out.set(0);
   }
 }

@@ -2,6 +2,7 @@
 // Haptics Bridge: Schaden in Spielen -> Vibration über Intiface.
 //   node bridge.mjs                 normal starten (config.json, sonst Standardwerte)
 //   node bridge.mjs --dry           ohne Intiface, Stärke nur in der Konsole anzeigen
+//   node bridge.mjs --vrchat        VRChat-OSC einschalten
 //   node bridge.mjs --config x.json andere Konfigurationsdatei
 
 import fs from 'node:fs';
@@ -12,10 +13,12 @@ import { Engine } from './src/engine.js';
 import { startServer } from './src/server.js';
 import { cs2, dota2 } from './src/adapters/valve-gsi.js';
 import { watchLog } from './src/adapters/logwatch.js';
+import { startVrchatOsc } from './src/adapters/vrchat-osc.js';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const args = process.argv.slice(2);
 const dry = args.includes('--dry');
+const vrc = args.includes('--vrchat');
 const ci = args.indexOf('--config');
 const cfgPath = ci >= 0 ? path.resolve(args[ci + 1]) : path.join(here, 'config.json');
 
@@ -54,6 +57,8 @@ if (cfg.games.dota2) routes['/dota2'] = dota2(engine);
 const server = startServer({ port: cfg.port, token: cfg.token, engine, output, routes, log });
 
 const stopWatchers = cfg.logWatchers.filter((w) => w.enabled !== false).map((w) => watchLog(w, engine, log));
+if (vrc) cfg.vrchat.enabled = true;
+if (cfg.vrchat.enabled) stopWatchers.push(startVrchatOsc(cfg.vrchat, engine, log));
 
 let quitting = false;
 async function quit() {

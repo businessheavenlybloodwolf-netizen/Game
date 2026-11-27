@@ -1,0 +1,6 @@
+{
+  "name": "Spider-Man",
+  "fps": 12,
+  "bar": { "x1": null, "x2": null, "y": null, "color": null, "tolerance": 45, "minDrop": 0.02, "maxHp": 100, "hiddenBelow": 0.03, "stableFrames": 2 },
+  "grey": null
+}

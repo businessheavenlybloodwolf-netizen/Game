@@ -34,6 +34,14 @@ export function startServer({ port, token, engine, output, routes, log = console
       const sent = req.headers['x-token'] || data.token || data.auth?.token || '';
       if (token && sent !== token) return json(res, 401, { error: 'Falscher Token' });
 
+      if (path === '/event' && data.type === 'health') {
+        engine.setHealth(data.value == null ? null : Number(data.value));
+        return json(res, 200, { ok: true });
+      }
+      if (path === '/event' && data.type === 'level') {
+        engine.setLevel(`http:${data.key || 'default'}`, data.value);
+        return json(res, 200, { ok: true });
+      }
       if (path === '/event') {
         const ok = engine.trigger({ ...data, source: data.source || 'HTTP' });
         return json(res, ok ? 200 : 400, ok ? { ok: true } : { error: `Unbekannter Event-Typ: ${data.type}` });

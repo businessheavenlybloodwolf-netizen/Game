@@ -8,6 +8,7 @@
   "scripts": {
     "start": "node bridge.mjs",
     "dry": "node bridge.mjs --dry",
+    "vrchat": "node bridge.mjs --vrchat",
     "hit": "node tools/send.mjs damage 30"
   }
 }

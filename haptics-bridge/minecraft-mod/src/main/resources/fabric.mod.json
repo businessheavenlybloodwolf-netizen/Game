@@ -1,0 +1,16 @@
+{
+  "schemaVersion": 1,
+  "id": "haptics_bridge",
+  "version": "${version}",
+  "name": "Haptics Bridge",
+  "description": "Schickt Schaden und Tod an die Haptics Bridge, damit Geräte über Intiface vibrieren.",
+  "license": "MIT",
+  "environment": "client",
+  "entrypoints": { "client": ["de.hapticsbridge.HapticsBridgeMod"] },
+  "depends": {
+    "fabricloader": ">=0.16.0",
+    "fabric-api": "*",
+    "minecraft": "~${minecraft_version}",
+    "java": ">=21"
+  }
+}
