@@ -1,0 +1,60 @@
+﻿HAPTICS BRIDGE FÜR MINECRAFT
+============================
+
+Dein Gerät vibriert, wenn du in Minecraft Schaden nimmst. Je mehr Schaden, desto stärker.
+Beim Tod kommt ein langer Puls und bei weniger als 3 Herzen ein Herzschlag.
+
+Für: Minecraft Java Edition 1.21.1 mit Fabric, Windows.
+
+
+EINMALIG EINRICHTEN
+-------------------
+
+1. Intiface Central installieren: https://intiface.com/central/
+
+2. Fabric für Minecraft 1.21.1 installieren: https://fabricmc.net/use/installer/
+   Im Installer "Client" wählen, als Version 1.21.1 eintragen und auf "Installieren" klicken.
+
+3. Alles aus dem Ordner "mods" (aus dieser ZIP) kopieren nach:
+      %AppData%\.minecraft\mods
+   (Win+R drücken, %AppData%\.minecraft eingeben, Enter. Den Ordner "mods" ggf. anlegen.)
+   Darin sind die Haptics-Bridge-Mod und die Fabric API.
+
+
+JEDES MAL ZUM SPIELEN
+---------------------
+
+1. Intiface Central starten, "Start Server" drücken und dein Gerät verbinden.
+2. HapticsBridge.exe doppelklicken. Das schwarze Fenster offen lassen.
+   Dort sollte stehen: "Intiface verbunden" und "Gerät bereit: ...".
+3. Minecraft mit dem Profil "fabric-loader-1.21.1" starten.
+
+Beim ersten Start warnt Windows eventuell ("Der Computer wurde durch Windows geschützt"),
+weil die .exe nicht signiert ist. Dann auf "Weitere Informationen" und "Trotzdem ausführen" klicken.
+Fragt die Windows-Firewall nach, darf die Bridge nur ins "Private Netzwerk". Sie ist sowieso nur auf deinem PC erreichbar.
+
+Zum Beenden das Fenster schließen oder Strg+C drücken.
+
+
+EINSTELLEN (config.json, mit dem Editor öffnen)
+-----------------------------------------------
+
+  "maxIntensity": 0.8     Höchste Stärke (0 bis 1). Zu stark? Kleiner machen.
+  "minIntensity": 0.3     Stärke bei einem halben Herz Schaden.
+  "intensity": 0.9        Stärke bei sehr viel Schaden (10 Herzen auf einmal).
+  "durationMs"            Dauer in Millisekunden.
+  "lowHealth"             Herzschlag bei wenig Leben. "enabled": false schaltet ihn aus.
+                          "threshold": 0.3 heißt unter 30 % Leben, also unter 3 Herzen.
+  "devices": ["Lush"]     Nur bestimmte Geräte ansteuern (Teil des Namens). Leer heißt alle.
+
+Nach einer Änderung HapticsBridge.exe neu starten.
+
+
+PROBLEME
+--------
+
+"Intiface nicht erreichbar"   Intiface Central läuft nicht oder "Start Server" wurde nicht gedrückt.
+"Port 3110 ist schon belegt"  Die Bridge läuft schon in einem anderen Fenster.
+Keine Vibration im Spiel      Prüfen, ob die Mod geladen ist: Minecraft-Hauptmenü, "Mods" bzw. im Ordner mods.
+                              Testen, ob die Mod überhaupt läuft: in Minecraft Schaden nehmen und im
+                              Fenster der Bridge nach "[Minecraft] damage" schauen.
