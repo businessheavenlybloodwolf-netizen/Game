@@ -4,7 +4,7 @@ import http from 'node:http';
 
 const MAX_BODY = 256 * 1024;
 
-export function startServer({ port, token, engine, output, routes, log = console.log }) {
+export function startServer({ port, token, engine, output, routes, log = console.log, fatal = (m) => { log(m); process.exit(1); } }) {
   const server = http.createServer((req, res) => {
     res.setHeader('Access-Control-Allow-Origin', '*');
     res.setHeader('Access-Control-Allow-Headers', 'Content-Type, X-Token');
@@ -54,8 +54,7 @@ export function startServer({ port, token, engine, output, routes, log = console
   });
 
   server.on('error', (e) => {
-    log(e.code === 'EADDRINUSE' ? `Port ${port} ist schon belegt. Läuft die Bridge schon?` : `Serverfehler: ${e.message}`);
-    process.exit(1);
+    fatal(e.code === 'EADDRINUSE' ? `Port ${port} ist schon belegt. Läuft die Bridge schon?` : `Serverfehler: ${e.message}`);
   });
   // Nur lokal erreichbar, nicht aus dem Netzwerk.
   server.listen(port, '127.0.0.1', () => log(`Bridge hört auf http://127.0.0.1:${port}`));

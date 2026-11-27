@@ -59,7 +59,7 @@ VRChat selbst hat keine Lebenspunkte. „Schaden“ gibt es nur in Welten mit ei
 
 1. [Fabric Loader](https://fabricmc.net/use/) für **Minecraft 1.21.1** installieren und [Fabric API](https://modrinth.com/mod/fabric-api) in den `mods`-Ordner legen.
 2. Die Mod `haptics-bridge-minecraft-1.0.0.jar` ebenfalls in `%AppData%\.minecraft\mods` legen.
-   Die Datei baut GitHub automatisch: Repository → **Actions** → „Minecraft-Mod bauen“ → letzter Lauf → **Artifacts**.
+   Fertig zum Herunterladen im Release [minecraft-v1.0.0](https://github.com/businessheavenlybloodwolf-netizen/Game/releases/tag/minecraft-v1.0.0): Die ZIP enthält die Bridge als `.exe`, eine für Minecraft eingestellte `config.json`, die Mod, die Fabric API und eine Anleitung.
 3. Bridge starten, dann Minecraft starten. Ein Herz Schaden (2 von 20 HP) gibt eine leichte, viel Schaden eine starke Vibration.
 
 Für eine andere Minecraft-Version die Versionsnummern in `minecraft-mod/gradle.properties` anpassen.
