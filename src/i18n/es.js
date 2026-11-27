@@ -1,6 +1,7 @@
 export default {
   name: 'Español',
   ui: {
+    challengeZone: "Abismo celeste – Desafíos",
     fpsShow: "Mostrar FPS",
     slots: "Partidas",
     slot: "Partida {n}",
@@ -84,6 +85,7 @@ export default {
     tip: 'En el móvil: stick a la izquierda, botones a la derecha, desliza para girar la cámara.',
   },
   hints: {
+    challengeZone: "¡El Abismo celeste! Desde aquí cinco desafíos cruzan el vacío. Pasa por una puerta de salida para iniciar el tiempo, ¡y abajo no hay suelo!",
     ship: "La Pluma de Luz: aquí viajas a otros reinos cuando su farol tiene suficientes fragmentos lunares. (Enter / T / Y)",
     
     move: 'Moverse: WASD / flechas · Saltar: ESPACIO · pulsa otra vez en el aire = ¡doble salto! Cámara: arrastra el ratón o Q / E',

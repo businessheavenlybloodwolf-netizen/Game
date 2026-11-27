@@ -1,6 +1,7 @@
 export default {
   name: 'English',
   ui: {
+    challengeZone: "Sky Chasm – Challenges",
     fpsShow: "FPS counter",
     slots: "Save slots",
     slot: "Slot {n}",
@@ -84,6 +85,7 @@ export default {
     tip: 'On phones: stick on the left, buttons on the right, swipe to turn the camera.',
   },
   hints: {
+    challengeZone: "The Sky Chasm! Five challenges lead from here across the abyss. Run through a start gate to start the clock – and there's no ground below!",
     ship: "The Lightfeather: travel to other kingdoms here once its lantern holds enough moon shards. (Enter / T / Y)",
     
     move: 'Move: WASD / arrow keys · Jump: SPACE · press again in the air = double jump! Camera: drag the mouse or Q / E',

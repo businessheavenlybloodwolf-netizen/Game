@@ -1,6 +1,7 @@
 export default {
   name: 'Français',
   ui: {
+    challengeZone: "Gouffre céleste – Défis",
     fpsShow: "Afficher les FPS",
     slots: "Sauvegardes",
     slot: "Sauvegarde {n}",
@@ -84,6 +85,7 @@ export default {
     tip: 'Sur mobile : stick à gauche, boutons à droite, glisse pour tourner la caméra.',
   },
   hints: {
+    challengeZone: "Le Gouffre céleste ! Cinq défis partent d'ici au-dessus de l'abîme. Passe sous un portail de départ pour lancer le chrono – et il n'y a pas de sol en dessous !",
     ship: "La Plume-Lumière : ici, tu voyages vers d'autres royaumes quand sa lanterne contient assez d'éclats de lune. (Entrée / T / Y)",
     
     move: 'Bouger : WASD / flèches · Sauter : ESPACE · appuie encore en l\'air = double saut ! Caméra : glisse la souris ou Q / E',

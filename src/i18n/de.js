@@ -1,6 +1,7 @@
 export default {
   name: 'Deutsch',
   ui: {
+    challengeZone: "Himmelsschlucht – Herausforderungen",
     fpsShow: "FPS-Anzeige",
     slots: "Spielstände",
     slot: "Spielstand {n}",
@@ -84,6 +85,7 @@ export default {
     tip: 'Auf dem Handy: Stick links, Knöpfe rechts, Kamera durch Wischen.',
   },
   hints: {
+    challengeZone: "Die Himmelsschlucht! Fünf Herausforderungen führen von hier über den Abgrund. Durch ein Start-Tor laufen startet die Zeit – und unten gibt es keinen Boden!",
     ship: "Die Leuchtfeder: Hier reist du in andere Reiche, sobald ihre Laterne genug Mondsplitter hat. (Enter / T / Y)",
     
     move: 'Bewegen: WASD / Pfeiltasten · Springen: LEERTASTE · in der Luft nochmal drücken = Doppelsprung! Kamera: Maus ziehen oder Q / E',

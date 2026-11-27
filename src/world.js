@@ -636,26 +636,10 @@ export class Level {
       g.recs.push(r); g.level = Math.min(g.level, r.top - 3.6);
       g.minX = Math.min(g.minX, r.x - r.r - 3); g.maxX = Math.max(g.maxX, r.x + r.r + 3); g.minZ = Math.min(g.minZ, r.z - r.r - 3); g.maxZ = Math.max(g.maxZ, r.z + r.r + 3);
     }
+    const ABYSS = -170;
     const inRegion = (g, x, z, m = 0) => x > g.minX - m && x < g.maxX + m && z > g.minZ - m && z < g.maxZ + m;
     // Bergrücken unter den Inselketten (die Wege steigen mit dem Gelände an)
     if (kingdom) for (const r of recs) if (r.course === null || r.course === undefined) T.liftCircle(r.x, r.z, r.r, r.top - 7.5, 0.33, 26);
-    // Uferland rund um die Senken: folgt der Strecke (organische Form), damit das Wasser nur in der Senke steht
-    for (const g of regions.values()) {
-      g.mask = new Uint8Array(T.nx * T.nz);
-      const R0 = 15, fall = 20;
-      const mark = (cx, cz, rad) => T.raster(cx, cz, rad + R0 + fall, 'max', (x, z) => {
-        const d = Math.hypot(x - cx, z - cz) - rad;
-        if (d <= R0) { const i = Math.round((x - T.minX) / T.cell), j = Math.round((z - T.minZ) / T.cell); g.mask[T.idx(i, j)] = 1; return g.level + 0.8; }
-        return d < R0 + fall ? g.level + 0.8 - (d - R0) * 0.45 : undefined;
-      });
-      for (const r of g.recs) mark(r.x, r.z, r.r);
-      for (const l of this.links) {
-        const [ax, , az] = l.a, [bx, , bz] = l.b;
-        if (!inRegion(g, ax, az) || !inRegion(g, bx, bz)) continue;
-        const n = Math.max(1, Math.ceil(Math.hypot(bx - ax, bz - az) / 3));
-        for (let k = 0; k <= n; k++) mark(ax + (bx - ax) * k / n, az + (bz - az) * k / n, 1);
-      }
-    }
     // Plattformen und Sprungwege freihalten (begehbare Hänge)
     for (const r of recs) {
       const hz = kingdom ? (r.course !== null && r.course !== undefined) : true;
@@ -666,21 +650,25 @@ export class Level {
       const [ax, ay, az] = l.a, [bx, by, bz] = l.b;
       let hzr = null;
       for (const g of regions.values()) if (inRegion(g, ax, az) && inRegion(g, bx, bz)) { hzr = g; break; }
-      if (hzr) T.capSegment(ax, az, bx, bz, 2.6, hzr.level - 2.6, 0.6, 18);
+      if (hzr) T.capSegment(ax, az, bx, bz, 5, ABYSS, 3.5, 60);
       else T.capSegment(ax, az, bx, bz, 1.6, Math.min(ay, by) - 2.0, 0.6, 18);
     }
-    for (const g of regions.values()) for (const r of g.recs) T.capCircle(r.x, r.z, r.r + 2.6, g.level - 2.6, 0.6, 18);
-    for (const g of regions.values()) T.hazards.push({ level: g.level, mask: g.mask, minX: g.minX - 18, maxX: g.maxX + 18, minZ: g.minZ - 18, maxZ: g.maxZ + 18 });
+    // Abgrund: rund um die Herausforderungen gibt es keinen Boden – steile Felswände fallen ins Leere
+    for (const g of regions.values()) for (const r of g.recs) T.capCircle(r.x, r.z, r.r + 5, ABYSS, 3.5, 60);
+    for (const g of regions.values()) T.hazards.push({ level: g.level - 6, void: true, minX: g.minX - 30, maxX: g.maxX + 30, minZ: g.minZ - 30, maxZ: g.maxZ + 30 });
     this.terrain = T;
     const tT1 = performance.now();
     // Gelände-Mesh und Senken-Füllung
     const mesh = T.buildMesh(this.T, wid);
     this.add(mesh);
-    this.hazardMeshes = T.hazardMeshes(this.T, wid);
+    this.hazardMeshes = T.voidMeshes(this.T, wid, this.def.theme);
     for (const hm of this.hazardMeshes) this.add(hm);
     // Plattformen auf den Boden stellen: Felssäulen statt schwebender Inseln
     for (const r of recs) {
       if (r.mesh.userData.dyn) continue;
+      // Herausforderungen schweben über dem Abgrund: dort bleibt der hängende Fels unter der Insel
+      const hz = kingdom ? (r.course !== null && r.course !== undefined) : true;
+      if (hz && T.height(r.x, r.z) < r.top - 20) continue;
       let ground = T.height(r.x, r.z);
       for (let k = 0; k < 8; k++) { const a = k / 8 * Math.PI * 2; ground = Math.min(ground, T.height(r.x + Math.cos(a) * r.r * 0.85, r.z + Math.sin(a) * r.r * 0.85)); }
       const bottom = r.top - r.h;
@@ -764,7 +752,7 @@ export class Level {
     const flag = new THREE.Mesh(new THREE.PlaneGeometry(3.0, 0.5), new THREE.MeshBasicMaterial({ map: this.T.checker, side: THREE.DoubleSide }));
     flag.position.y = 3.0; g.add(flag);
     M.addOutline(g, 0.03);
-    this.label(name, sub, x, top + 5.6, z, '#6fe8d8');
+    this.label(name, sub, x, top + 5.4 + (k % 2) * 1.5, z, '#6fe8d8');
     this.colliders.push(cylCollider(x + Math.cos(yaw) * 1.7, z - Math.sin(yaw) * 1.7, 0.3, top, top + 3.4));
     this.colliders.push(cylCollider(x - Math.cos(yaw) * 1.7, z + Math.sin(yaw) * 1.7, 0.3, top, top + 3.4));
     this.courses[k].gate = { x, y: top, z };

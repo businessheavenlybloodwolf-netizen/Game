@@ -1,6 +1,7 @@
 export default {
   name: 'Italiano',
   ui: {
+    challengeZone: "Abisso celeste – Sfide",
     fpsShow: "Mostra FPS",
     slots: "Salvataggi",
     slot: "Salvataggio {n}",
@@ -84,6 +85,7 @@ export default {
     tip: 'Sul telefono: levetta a sinistra, pulsanti a destra, scorri per ruotare la telecamera.',
   },
   hints: {
+    challengeZone: "L'Abisso celeste! Da qui cinque sfide attraversano il vuoto. Passa da un portale di partenza per avviare il tempo – e sotto non c'è terreno!",
     ship: "La Piuma di Luce: da qui viaggi verso altri regni quando la sua lanterna ha abbastanza frammenti di luna. (Invio / T / Y)",
     
     move: 'Muoviti: WASD / frecce · Salta: SPAZIO · premi di nuovo in aria = doppio salto! Telecamera: trascina il mouse o Q / E',

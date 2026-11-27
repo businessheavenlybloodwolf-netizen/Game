@@ -482,14 +482,14 @@ export function generateLevel(L, spec) {
 
   // ================= Herausforderung als Teil der offenen Welt =================
   // Startet an einer Arena der Inselkette, führt seitlich hinaus und endet an einem Ziel-Sockel.
-  function buildCourse(k, a) {
+  function buildCourse(k, a, headings = null) {
     const g = L.game, w = spec.world;
     const saved = { d, heading, baseH, spread, cur };
     const sideBase = (k % 2 ? 1 : -1) * Math.PI / 2;
-    for (const sd of [sideBase, -sideBase, sideBase * 0.5, -sideBase * 0.5]) {
-      const hs = a.h + sd;
+    const tries = headings || [sideBase, -sideBase, sideBase * 0.5, -sideBase * 0.5].map((sd) => a.h + sd);
+    for (const hs of tries) {
       d = Math.min(1, w / 7 * 0.6 + k / 5 * 0.3); if (k === 0) d *= 0.7;
-      baseH = heading = hs; spread = 0.75; cur = a;
+      baseH = heading = hs; spread = headings ? 0.32 : 0.75; cur = a;
       // passt die erste Plattform?
       if (!place(R(2.2, 3), 0, 3, '', { dry: true })) continue;
       const [dx, dz] = dir(hs);
@@ -704,12 +704,30 @@ export function generateLevel(L, spec) {
     // ---- Quests: sechs Auftraggeber mit verschiedenen Aufgaben ----
     if (L.quests) buildQuests(spokeArenas, spokeArenas2, peaks);
 
-    // ---- fünf Herausforderungen direkt in der Welt (ohne Ladebildschirm) ----
+    // ---- Herausforderungs-Zone: ein Platz am Rand der Himmelsschlucht, von dort 5 Strecken über den Abgrund ----
+    let plaza = null;
+    const zoneTries = [Math.PI - 0.45, Math.PI + 0.45, Math.PI, Math.PI - 0.9, Math.PI + 0.9];
+    for (const h0 of zoneTries) {
+      cur = start; baseH = heading = h0; spread = 0.3;
+      for (let i = 0; i < 3; i++) { if (!SEG.hops()) SEG.stairs(); }
+      plaza = place(R(2, 3), R(0, 1), 12, 'island');
+      if (plaza) break;
+    }
+    if (plaza) {
+      const [dx, dz] = dir(plaza.h);
+      L.checkpoint(plaza.x - dx * 4 + dz * 2, plaza.y, plaza.z - dz * 4 - dx * 2);
+      L.label(g.t('ui.challengeZone'), '', plaza.x - dx * 4, plaza.y + 9.5, plaza.z - dz * 4, '#6fe8d8');
+      L.hint(plaza.x - dx * 4, plaza.y, plaza.z - dz * 4, 4, 'challengeZone', false);
+    }
     for (let k = 0; k < 5; k++) {
-      const a = courseAt[k];
-      if (!a || !buildCourse(k, a)) {
+      const hs = plaza ? plaza.h + (k - 2) * 0.5 : 0;
+      const cand = [0, 0.18, -0.18, 0.36, -0.36, 0.6, -0.6, 0.85, -0.85, 1.1, -1.1].map((o) => hs + o);
+      let ok = plaza && buildCourse(k, plaza, cand);
+      // noch kein Platz? Dann vom Ende einer schon gebauten Strecke weiter hinaus
+      if (!ok && plaza) for (const c of L.courses) { if (!c || !c.goal) continue; const gp = placed.find((q) => Math.abs(q.x - c.goal.x) < 0.01 && Math.abs(q.z - c.goal.z) < 0.01); if (gp && buildCourse(k, gp, [0, 0.5, -0.5, 1, -1, 1.5, -1.5].map((o) => (gp.h || 0) + o))) { ok = true; break; } }
+      if (!ok) {
         // kein Platz: wie früher ein Lichttor zur eigenen Herausforderung
-        const ar = a || start;
+        const ar = courseAt[k] || start;
         const pa = (ar.h || 0) + Math.PI / 2 * (k % 2 ? 1 : -1);
         const px = ar.x + Math.sin(pa) * (ar.r - 2.6), pz = ar.z - Math.cos(pa) * (ar.r - 2.6);
         L.portal(px, ar.y, pz, Math.atan2(ar.x - px, ar.z - pz), { type: 'challenge', i: k }, g.t(`worlds.${w}.levels.${k}`), g.challengeSub(w, k), false);

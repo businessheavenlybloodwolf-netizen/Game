@@ -141,6 +141,23 @@ export class Terrain {
     return mesh;
   }
 
+  // Tief unter dem Abgrund: Wolkenmeer (bzw. Lava im Glutvulkan) – kein Boden, nur Weite
+  voidMeshes(T, worldId, theme) {
+    const out = [];
+    const key = worldId === 'lava' ? 'lava' : (theme.sea && T[theme.sea] ? theme.sea : 'cloudSea');
+    for (const hz of this.hazards) {
+      const w = hz.maxX - hz.minX + 160, d = hz.maxZ - hz.minZ + 160;
+      const tex = T[key].clone(); tex.needsUpdate = true; tex.repeat.set(w / 30, d / 30);
+      const lava = key === 'lava';
+      const m = new THREE.Mesh(new THREE.PlaneGeometry(w, d), new THREE.MeshBasicMaterial({ map: tex, color: lava ? 0xffffff : (theme.seaTint || 0xffffff), fog: true }));
+      m.rotation.x = -Math.PI / 2;
+      m.position.set((hz.minX + hz.maxX) / 2, hz.level - 40, (hz.minZ + hz.maxZ) / 2);
+      m.userData.flow = tex; m.userData.lava = lava;
+      out.push(m);
+    }
+    return out;
+  }
+
   hazardMeshes(T, worldId) {
     const out = [];
     const [key, color] = HAZARD[worldId] || HAZARD.meadow;

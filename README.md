@@ -78,13 +78,14 @@ Jede Welt ist ein frei begehbares **Reich**, eine **große, zusammenhängende La
   | Korallentiefe | Seetang, Muscheln, leuchtende Pilze | Schiffswracks | Blasen |
   | Nebelreich | Laternen, Zahnräder, tote Bäume | Uhrtürme | Nebelschwaden |
 - Alle Plattformen stehen als **Felssäulen und Tafelberge** auf dem Boden. Wer von einem Weg fällt, landet einfach in der Landschaft.
-- Die Herausforderungen liegen in **Senken mit Wasser, Lava, Treibsand oder Nebel** (je nach Welt). Wer dort hineinfällt, startet am letzten Checkpoint neu.
-  Boss-Arenen und Bonus-Level liegen ebenfalls in solchen Seen inmitten einer Landschaft.
+- **Himmelsschlucht:** Jedes Reich hat eine eigene **Herausforderungs-Zone**. Ein Weg führt vom Hub zu einem Platz am Rand einer großen Schlucht.
+  Dort ist **kein Boden** mehr, nur steile Felswände und tief unten ein Wolkenmeer (im Glutvulkan Lava).
+  Wer in den Abgrund fällt, startet am letzten Checkpoint neu. Boss-Arenen und Bonus-Level schweben ebenfalls über einem Abgrund.
 - In der Mitte liegt eine **Hub-Insel** mit dem Luftschiff **Leuchtfeder**, der Händlerin, einem Glimmling, der sein Kuscheltier vermisst,
   dem **Nebeltor** zum Boss und einem goldenen **Bonustor**.
 - Vom Hub führen **5 lange Inselketten** in alle Richtungen, jede mit zwei Arenen, und sie enden an einem **Gipfel**.
-- **Herausforderungen direkt in der Welt, ohne Ladebildschirm:** An der ersten Arena jeder Kette steht ein **Start-Tor**.
-  Wer hindurchläuft, startet die Zeitmessung. Die Strecke führt seitlich hinaus zu einem **Ziel-Sockel** mit Mondsplitter.
+- **Herausforderungen ohne Ladebildschirm:** Vom Platz der Himmelsschlucht führen die 5 Strecken fächerförmig als schwebende Inseln über den Abgrund.
+  An jeder steht ein **Start-Tor**, das die Zeitmessung startet. Am Ende wartet ein **Ziel-Sockel** mit Mondsplitter.
   Unterwegs gibt es zwei Geheimnisse, und für alle Funken der Strecke gibt es einen weiteren Splitter. Wer unter der Medaillenzeit bleibt, bekommt die Zeitmedaille.
 - **Quests:** In jedem Reich geben 6 Glimmlinge Aufträge (gelbes **!** über dem Kopf). Pro Reich sind es 6 von 8 Quest-Arten, jedes Reich in anderer Mischung:
 
@@ -168,7 +169,7 @@ In heißen Schleifen wird kein Speicher mehr pro Bild erzeugt (verhindert Ruckle
 ## Qualitätssicherung
 
 Der Generator notiert jeden Sprung des Levels, auch die Wege zu allen Geheimnissen. Ein Test-Bot springt jeden einzelnen davon mit
-der echten Spielphysik nach (`__lumi.debugTestLevel(welt, level)` in der Browser-Konsole). Aktueller Stand: **1314 von 1314 Sprüngen in den 8 Reichen (inklusive der 40 eingebauten Herausforderungen) sind schaffbar.** Ein zweiter Bot nimmt alle 48 Quests an und schließt sie ab.
+der echten Spielphysik nach (`__lumi.debugTestLevel(welt, level)` in der Browser-Konsole). Aktueller Stand: **1214 von 1214 Sprüngen in den 8 Reichen (inklusive der 40 Herausforderungen in der Himmelsschlucht) sind schaffbar**, dazu alle Boss- und Bonus-Level. Ein zweiter Bot nimmt alle 48 Quests an und schließt sie ab.
 
 ## Steuerung
 

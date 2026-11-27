@@ -1,6 +1,7 @@
 export default {
   name: 'Türkçe',
   ui: {
+    challengeZone: "Gök Uçurumu – Meydan Okumalar",
     fpsShow: "FPS göstergesi",
     slots: "Kayıtlar",
     slot: "Kayıt {n}",
@@ -84,6 +85,7 @@ export default {
     tip: 'Telefonda: solda çubuk, sağda düğmeler, kamerayı kaydırarak çevir.',
   },
   hints: {
+    challengeZone: "Gök Uçurumu! Buradan beş meydan okuma boşluğun üzerinden geçer. Süreyi başlatmak için başlangıç kapısından geç – ve aşağıda zemin yok!",
     ship: "Işık Tüyü: feneri yeterince ay parçasıyla dolunca buradan başka diyarlara gidersin. (Enter / T / Y)",
     
     move: 'Hareket: WASD / ok tuşları · Zıpla: BOŞLUK · havada tekrar bas = çift zıplama! Kamera: fareyi sürükle veya Q / E',
