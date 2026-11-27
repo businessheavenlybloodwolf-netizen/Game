@@ -44,6 +44,12 @@ export class HUD {
     this.el.moons.style.display = '';
     this.el.moons.innerHTML = arr.map((v) => `<span class="moon ${v ? 'full' : ''}"></span>`).join('');
   }
+  setQuest(q) {
+    const el = document.getElementById('quest');
+    if (!el) return;
+    el.classList.toggle('show', !!q);
+    if (q) { el.querySelector('.qt').textContent = q.title; el.querySelector('.qg').textContent = q.goal; }
+  }
   setTimer(t) {
     this.el.timer.style.display = t == null ? 'none' : '';
     if (t == null) return;
@@ -68,7 +74,6 @@ export class HUD {
     if (text === this.curPrompt) return;
     this.curPrompt = text;
     this.el.prompt.classList.toggle('show', !!text);
-    document.querySelector('[data-btn="act"]').classList.toggle('show', !!text);
     if (text) this.el.prompt.innerHTML = `<span class="key">${this.keyLabel || 'Enter'}</span> ${text}`;
   }
   setRace(t) {
@@ -186,7 +191,7 @@ export class HUD {
   }
   dialogInput(input) {
     if (!this.dlg) return false;
-    if (input.confirmPressed() || input.pressed.has('KeyK') || input.touchPressed.has('jump')) this.advanceDialog();
+    if (input.confirmPressed() || input.pressed.has('KeyK')) this.advanceDialog();
     if (input.pressed.has('Escape')) { this.dlgLines = []; this.dlg.done = true; this.advanceDialog(); }
     return true;
   }

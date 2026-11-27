@@ -11,6 +11,7 @@ import { HANDMADE } from './levels.js';
 import { WORLDS, BOSS_IDX, BONUS_IDX } from './worlds.js';
 import { HUD } from './ui.js';
 import { Director } from './cutscene.js';
+import { QUEST_IDS, questName } from './quests.js';
 import { Graphics, PRESETS, ORDER, loadPreset, savePreset } from './gfx.js';
 import { t, setLang, detectLang, LANGS, getLang } from './i18n/index.js';
 
@@ -18,11 +19,11 @@ const STEP = 1 / 120;
 const SLOTS = 3;
 // Speicherplatz 1 nutzt den bisherigen Schlüssel, damit alte Spielstände erhalten bleiben
 const slotKey = (n) => (n === 1 ? 'lumi_save_v3' : `lumi_save_v3_s${n}`);
-// Mondsplitter pro Reich: 20 in der offenen Welt, je 4 in 5 Herausforderungen, 4 im Bonus-Tor, 3 (großer Splitter) beim Boss
+// Mondsplitter pro Reich: 20 in der offenen Welt, 6 Quests, je 4 in 5 Herausforderungen (direkt in der Welt), 4 im Bonus-Tor, 3 (großer Splitter) beim Boss
 const OPEN_IDS = ['peak0', 'peak1', 'peak2', 'peak3', 'peak4', 'branch0', 'branch1', 'branch2', 'hid0', 'hid1', 'hid2',
   'pound0', 'pound1', 'crate0', 'crate1', 'pieces', 'lost', 'rings', 'shop', 'nest'];
 const CH_IDS = (p) => [p + 'g', p + 'm0', p + 'm1', p + 'm2'];
-const ALL_IDS = [...OPEN_IDS, ...[0, 1, 2, 3, 4].flatMap((i) => CH_IDS('c' + i)), ...CH_IDS('b'), 'boss'];
+const ALL_IDS = [...OPEN_IDS, ...QUEST_IDS, ...[0, 1, 2, 3, 4].flatMap((i) => CH_IDS('c' + i)), ...CH_IDS('b'), 'boss'];
 const KINGDOM_TOTAL = ALL_IDS.length + 2; // Boss zählt 3
 const TRAVEL_REQ = [10, 12, 14, 16, 18, 20, 22];
 const SHOP_PRICE = 100;
@@ -98,7 +99,6 @@ class Game {
     const unlockAudio = () => this.audio.init();
     window.addEventListener('pointerdown', unlockAudio);
     window.addEventListener('keydown', unlockAudio);
-    window.addEventListener('touchstart', unlockAudio);
     canvas.addEventListener('click', () => { if (this.state === 'play') this.input.requestLock(); });
     let wasLocked = false;
     document.addEventListener('pointerlockchange', () => {
@@ -128,10 +128,6 @@ class Game {
   }
 
   applyLangToDom() {
-    document.querySelector('[data-btn="jump"]').textContent = t('ui.jump');
-    document.querySelector('[data-btn="spin"]').textContent = t('ui.spin');
-    document.querySelector('[data-btn="pound"]').textContent = t('ui.pound');
-    document.querySelector('[data-btn="act"]').textContent = '!';
     document.querySelector('#dialog .next').textContent = t('ui.next') + ' ▶';
     document.title = 'LUMI – ' + t('ui.subtitle');
   }
@@ -202,6 +198,8 @@ class Game {
     if (this.level) { this.scene.remove(this.level.group); this.level.dispose(); }
     this.particles.clear();
     this.cur = { w, i };
+    this.course = null;
+    this.hud.setQuest(null); this.hud.setRace(null);
     this.level = new Level(this.spec(w, i), this);
     this.scene.add(this.level.group);
     this.scene.fog = this.level.fog;
@@ -225,7 +223,6 @@ class Game {
     this.lighthouseLit = false;
     if (!this.level || this.cur.w !== 0 || this.cur.i !== -1) this.loadLevel(0, -1);
     this.hud.show(false);
-    this.setTouch(false);
     this.audio.playMusic('title');
     const prog = this.hasProgress();
     const items = [];
@@ -475,9 +472,8 @@ class Game {
     this.hearts = 3; this.levelGot = 0; this.levelTime = 0;
     this.hud.show(true);
     this.refreshHud();
-    this.setTouch(true);
     this.audio.playMusic(WORLDS[w].music);
-    const go = () => { this.state = 'play'; this.setTouch(true); this.hud.show(true); };
+    const go = () => { this.state = 'play'; this.hud.show(true); };
     if (!this.save.seen[w]) {
       this.save.seen[w] = true; this.writeSave();
       this.state = 'story';
@@ -498,6 +494,7 @@ class Game {
       this.enterChallenge(it.target);
       return;
     }
+    if (it.kind === 'quest') { this.questTalk(it); return; }
     const npcName = t('npc.' + it.kind + 'Name');
     const say = (key, after) => {
       this.state = 'story';
@@ -517,6 +514,33 @@ class Game {
     }
   }
 
+  // Gespräch mit einem Quest-Glimmling (mit Zwei-Personen-Cutscene)
+  questTalk(it) {
+    const QS = this.level.quests; if (!QS) return;
+    const q = QS.list.find((x) => x.i === it.quest);
+    const res = QS.talk(it.quest);
+    if (!res) return;
+    const [key, p] = res;
+    const name = questName(this.cur.w, it.quest);
+    const text = key === 'remind' || key === 'thanks' ? t('quest.' + key, p) : t(`quest.${q.type}.${key}`, { ...p, name: questName(this.cur.w, it.quest + 3) });
+    this.state = 'story';
+    this.director.start('talk', [['e', '']], this.cur.w, new THREE.Vector3(it.x, it.y, it.z));
+    this.hud.dialog([{ role: 'q', who: name, text }], () => { this.director.stop(); this.state = 'play'; }, (i) => this.director.next(i));
+  }
+
+  questLog() {
+    const QS = this.level && this.level.quests;
+    const w = this.cur.w;
+    let rows = '';
+    if (QS) {
+      rows = QS.list.map((q) => {
+        const st = q.state === 'done' ? 'done' : q.state === 'active' ? 'active' : 'open';
+        return `<div class="qrow"><span class="moon ${this.hasMoon(w, 'q' + q.i) ? 'full' : ''}"></span><b>${q.name}</b><span>${t(`quest.${q.type}.title`)}</span><span class="st ${st}">${t('quest.st_' + st)}</span></div>`;
+      }).join('');
+    } else rows = `<p>${t('quest.none')}</p>`;
+    this.hud.showMenu({ title: t('quest.log'), subtitle: t(`worlds.${w}.name`), body: `<div class="qlist">${rows}</div>`, items: [{ label: t('ui.back'), action: () => { this.state = 'play'; this.pause(); } }] });
+  }
+
   enterChallenge(target) {
     const w = this.cur.w;
     this.returnTo = { w, target };
@@ -529,7 +553,6 @@ class Game {
 
   showTravel() {
     this.state = 'menu';
-    this.setTouch(false);
     this.input.releaseLock();
     const items = WORLDS.map((W, w) => {
       const open = this.kingdomOpen(w);
@@ -560,6 +583,8 @@ class Game {
       if (m) return `${t('moonTypes.' + m[1])} ${+m[2] + 1}`;
       const c = id.match(/^(c(\d)|b)(g|m0|m1|m2)$/);
       if (c) return `${c[2] !== undefined ? t(`worlds.${w}.levels.${c[2]}`) : t('ui.bonusLevel')}: ${t('moonTypes.' + { g: 'goal', m0: 'secret', m1: 'secret', m2: 'sparks' }[c[3]])}`;
+      const qm = id.match(/^q(\d)$/);
+      if (qm) { const q = this.level && this.level.quests && this.level.quests.list.find((x) => x.i === +qm[1]); return `${t('quest.log')}: ${q ? t(`quest.${q.type}.title`) : '?'}`; }
       return t('moonTypes.' + id);
     };
     const rows = ALL_IDS.map((id) => `<div class="mrow ${this.hasMoon(w, id) ? 'got' : ''}"><span class="moon ${this.hasMoon(w, id) ? 'full' : ''}"></span> ${this.hasMoon(w, id) ? label(id) : '? ? ?'}${id === 'boss' ? ' ×3' : ''}</div>`).join('');
@@ -572,7 +597,6 @@ class Game {
     this.hud.show(true);
     this.refreshHud();
     this.state = 'play';
-    this.setTouch(true);
     this.audio.playMusic(i === BONUS_IDX ? 'bonus' : WORLDS[w].music);
     this.hud.banner(this.levelName(w, i), `${t(`worlds.${w}.name`)} · ${i === BOSS_IDX ? t('ui.boss') : i === BONUS_IDX ? '★' : t('ui.challenge')}`);
   }
@@ -589,17 +613,16 @@ class Game {
     else this.hud.setMoons([sp.idPrefix + 'g', sp.idPrefix + 'm0', sp.idPrefix + 'm1', sp.idPrefix + 'm2'].map((id) => this.hasMoon(sp.world, id)));
   }
 
-  setTouch(v) { document.getElementById('touch').classList.toggle('active', v); }
 
   pause() {
     if (this.state !== 'play') return;
     this.state = 'paused';
-    this.setTouch(false);
     this.input.releaseLock();
     const { w, i } = this.cur;
     const again = () => { this.state = 'play'; this.pause(); };
     const items = [{ label: t('ui.resume'), action: () => this.resume() }];
     if (this.inKingdom) {
+      items.push({ label: t('quest.log'), action: () => this.questLog() });
       items.push({ label: t('ui.moonList'), action: () => this.moonList() });
       items.push({ label: t('ui.toShip'), action: () => { this.hud.hideMenu(); this.enterKingdom(w); } });
     } else {
@@ -625,7 +648,6 @@ class Game {
     this.loadLevel(w, i);
     this.state = 'promo';
     this.hud.show(false);
-    this.setTouch(false);
     document.getElementById('dialog').style.display = 'none';
     this.promo = { a: +(p.get('a') || 0.5), d: +(p.get('d') || 9), h: +(p.get('h') || 3), fx: +(p.get('fx') || 0), fz: +(p.get('fz') || 0), look: +(p.get('ly') || 1.2) };
     const pl = this.player; const sp = this.level.spawnPoint;
@@ -651,7 +673,6 @@ class Game {
   resume() {
     this.hud.hideMenu();
     this.state = 'play';
-    this.setTouch(true);
     this.acc = 0;
   }
 
@@ -670,8 +691,37 @@ class Game {
     this.refreshHud();
   }
 
+  // ---------------- Herausforderungen in der offenen Welt ----------------
+  startCourse(k) {
+    if (!this.inKingdom || this.state !== 'play') return;
+    if (this.course && this.course.k === k && this.course.t < 3) return;
+    const c = this.level.courses[k];
+    this.course = { k, t: 0, par: c ? c.par : 60 };
+    this.audio.play('checkpoint');
+    const fmt = (x) => `${Math.floor(x / 60)}:${String(Math.floor(x % 60)).padStart(2, '0')}`;
+    this.hud.banner(this.levelName(this.cur.w, k), `${t('ui.challenge')} · ⏱ ${t('ui.par')}: ${fmt(this.course.par)}`, 2.2);
+  }
+
+  finishCourse(k) {
+    const w = this.cur.w, c = this.course && this.course.k === k ? this.course : null;
+    if (!c && this.rec(w, k).done) return;
+    const r = this.rec(w, k);
+    r.done = true;
+    if (c) {
+      r.time = r.time ? Math.min(r.time, c.t) : c.t;
+      if (c.t <= c.par) { r.medal = true; this.hud.toast(`⏱ ${t('ui.medal')}`, 3); }
+    }
+    this.course = null;
+    this.hud.setTimer(null);
+    if (c) { const fmt = (x) => `${Math.floor(x / 60)}:${String(Math.floor(x % 60)).padStart(2, '0')}`; this.hud.banner(t('ui.cleared', { name: this.levelName(w, k) }), `⏱ ${fmt(c.t)}`, 2.4); }
+    this.audio.play('clear');
+    this.writeSave();
+  }
+
   collectMoon(id, pos) {
     const w = this.cur.w;
+    const cm = this.inKingdom && id.match(/^c(\d)g$/);
+    if (cm) this.finishCourse(+cm[1]);
     const fresh = !this.hasMoon(w, id);
     const before = this.moonCount(w);
     this.moons(w)[id] = id === 'boss' ? 3 : 1;
@@ -745,13 +795,13 @@ class Game {
     this.player.reset(c.x, c.y, c.z + 0.01, this.camYaw + Math.PI);
     this.player.invuln = 1.2;
     this.camTarget.set(c.x, c.y + 1.3, c.z);
+    if (this.level.quests) this.level.quests.onRespawn();
     if (this.level.lost && this.level.lost.state === 'carried') { const L = this.level.lost; L.state = 'lying'; L.pos.set(L.home.x, L.home.y, L.home.z); }
   }
 
   // Ziel einer Herausforderung / Kristall nach dem Boss
   collectShard(goal) {
     this.state = 'clear'; this.timer = 0;
-    this.setTouch(false);
     this.input.releaseLock();
     this.audio.stopMusic();
     this.audio.play('shard');
@@ -883,6 +933,7 @@ class Game {
   promptText(it) {
     if (it.kind === 'ship') return t('ui.travel');
     if (it.kind === 'portal') return `${t('ui.enter')}: ${it.name}`;
+    if (it.kind === 'quest') return `${t('ui.talk')}: ${questName(this.cur.w, it.quest)}`;
     return `${t('ui.talk')}: ${t('npc.' + it.kind + 'Name')}`;
   }
 
@@ -908,7 +959,8 @@ class Game {
         this.simulate(dt);
         if (this.state !== 'play') break;
         this.hud.hint(L.checkpointHint(this.player));
-        this.hud.setTimer(this.inKingdom ? null : this.levelTime);
+        if (this.course) this.course.t += dt;
+        this.hud.setTimer(this.inKingdom ? (this.course ? this.course.t : null) : this.levelTime);
         {
           const it = L.nearestInteractable(this.player.pos);
           this.hud.prompt(it ? this.promptText(it) : null);

@@ -29,7 +29,7 @@ Der Spielstand liegt im Benutzerprofil des Spiels.
 3. **Uploads:**
    - `lumi-web-itch.zip` hochladen → Haken bei **„This file will be played in the browser“**
    - optional zusätzlich `LUMI-win32-x64.zip` (Plattform: Windows), `LUMI-linux-x64.zip` (Linux), `LUMI-darwin-arm64.zip` (macOS)
-4. **Embed options:** Viewport `1280 × 720`, Haken bei **Fullscreen button** und **Mobile friendly** (Ausrichtung: Landscape)
+4. **Embed options:** Viewport `1280 × 720`, Haken bei **Fullscreen button**, **Mobile friendly** NICHT setzen (reine PC-Version: Tastatur, Maus oder Gamepad)
 5. **Cover image:** `store/itch/cover_630x500.png`; **Screenshots:** `store/screenshots/*`
 6. Speichern → Vorschau testen → veröffentlichen
 

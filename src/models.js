@@ -1,6 +1,7 @@
 // Alle Figuren & Objekte werden aus Grundformen gebaut (eigener Stil: rundlich, Toon-Shading, Outline).
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
+import { roundBox, pebble } from './shapes.js';
 
 let T = null;
 const matCache = new Map();
@@ -88,13 +89,13 @@ function refinedGeo(g) {
   if (refineCache.has(g.uuid)) return refineCache.get(g.uuid);
   const p = g.parameters || {};
   let n = null;
-  if (g.type === 'SphereGeometry' && p.widthSegments < 32 && p.widthSegments >= 8) {
+  if (g.type === 'SphereGeometry' && p.widthSegments < 32 && p.widthSegments >= 5) {
     n = new THREE.SphereGeometry(p.radius, Math.max(32, p.widthSegments * 2), Math.max(20, p.heightSegments * 2), p.phiStart, p.phiLength, p.thetaStart, p.thetaLength);
-  } else if (g.type === 'CylinderGeometry' && p.radialSegments >= 8 && p.radialSegments < 28) {
+  } else if (g.type === 'CylinderGeometry' && p.radialSegments >= 4 && p.radialSegments < 28) {
     n = new THREE.CylinderGeometry(p.radiusTop, p.radiusBottom, p.height, 28, p.heightSegments, p.openEnded, p.thetaStart, p.thetaLength);
-  } else if (g.type === 'ConeGeometry' && p.radialSegments >= 8 && p.radialSegments < 28) {
+  } else if (g.type === 'ConeGeometry' && p.radialSegments >= 4 && p.radialSegments < 28) {
     n = new THREE.ConeGeometry(p.radius, p.height, 28, p.heightSegments, p.openEnded, p.thetaStart, p.thetaLength);
-  } else if (g.type === 'TorusGeometry' && p.radialSegments >= 6 && p.tubularSegments < 48) {
+  } else if (g.type === 'TorusGeometry' && p.radialSegments >= 4 && p.tubularSegments < 48) {
     n = new THREE.TorusGeometry(p.radius, p.tube, Math.max(12, p.radialSegments * 2), Math.max(48, p.tubularSegments * 2), p.arc);
   } else if (g.type === 'CapsuleGeometry' && p.radialSegments < 20) {
     n = new THREE.CapsuleGeometry(p.radius, p.length, Math.max(8, p.capSegments * 2), 20);
@@ -216,8 +217,8 @@ export function createLumi() {
   const scarf = mesh(new THREE.TorusGeometry(0.36, 0.075, 8, 24), scarfM, 0, 0.92, 0, body);
   scarf.rotation.x = Math.PI / 2;
   const tail = new THREE.Group(); tail.position.set(0.12, 0.9, -0.34); body.add(tail);
-  const t1 = mesh(new THREE.BoxGeometry(0.16, 0.06, 0.4), scarfM, 0, 0, -0.18, tail);
-  const t2 = mesh(new THREE.BoxGeometry(0.14, 0.05, 0.3), toon(0x24978c), 0.05, -0.04, -0.12, t1);
+  const t1 = mesh(roundBox(0.16, 0.06, 0.4), scarfM, 0, 0, -0.18, tail);
+  const t2 = mesh(roundBox(0.14, 0.05, 0.3), toon(0x24978c), 0.05, -0.04, -0.12, t1);
   t2.rotation.y = 0.3;
 
   // Hände & Füße
@@ -241,7 +242,7 @@ function eyes(parent, y, z, spread, size, color = 0xffe14a) {
   for (const sx of [-1, 1]) {
     const e = mesh(S, m, sx * spread, y, z, parent); e.scale.set(size, size * 0.7, size * 0.5);
     e.rotation.z = -sx * 0.4; e.userData.noOutline = true; e.castShadow = false;
-    const brow = mesh(new THREE.BoxGeometry(size * 2.4, size * 0.5, size * 0.6), toon(0x150c22), sx * spread, y + size * 0.9, z + 0.02, parent);
+    const brow = mesh(roundBox(size * 2.4, size * 0.5, size * 0.6), toon(0x150c22), sx * spread, y + size * 0.9, z + 0.02, parent);
     brow.rotation.z = sx * 0.45; brow.userData.noOutline = true;
   }
 }
@@ -368,7 +369,7 @@ export function createBoss(cfg = {}) {
     const e = mesh(new THREE.SphereGeometry(0.45, 16, 12), eyeW, sx * 0.75, 2.8, 1.85, body); e.scale.set(1, 1.15, 0.5);
     const p = mesh(new THREE.SphereGeometry(0.18, 12, 8), pupil, sx * 0.72, 2.75, 2.08, body); p.userData.noOutline = true;
     pupils.push(p);
-    const brow = mesh(new THREE.BoxGeometry(0.9, 0.18, 0.2), toon(0x1a0f2a), sx * 0.75, 3.35, 2.0, body); brow.rotation.z = sx * 0.35;
+    const brow = mesh(roundBox(0.9, 0.18, 0.2), toon(0x1a0f2a), sx * 0.75, 3.35, 2.0, body); brow.rotation.z = sx * 0.35;
   }
   // Monokel – Graf Nebelmaul ist sehr eitel
   if (cfg.monocle !== false) { const mono = mesh(new THREE.TorusGeometry(0.52, 0.06, 8, 24), toon(0xe6c35a), 0.75, 2.8, 2.05, body); mono.userData.noOutline = true; }
@@ -449,7 +450,7 @@ export function createCheckpoint() {
   const root = new THREE.Group();
   const w = toon(0x7a4a2a);
   mesh(new THREE.CylinderGeometry(0.1, 0.14, 2.4, 8), w, 0, 1.2, 0, root);
-  mesh(new THREE.BoxGeometry(0.8, 0.1, 0.1), w, 0.3, 2.3, 0, root);
+  mesh(roundBox(0.8, 0.1, 0.1), w, 0.3, 2.3, 0, root);
   const lamp = new THREE.Group(); lamp.position.set(0.62, 1.95, 0); root.add(lamp);
   const lm = toon(0x9a9aa8, { unique: true });
   const l = mesh(new THREE.SphereGeometry(0.25, 14, 10), lm, 0, 0, 0, lamp); l.scale.y = 1.2;
@@ -512,6 +513,7 @@ export function createCrystal(rand, color = 0x8ff3ff) {
     const h = 0.6 + rand() * 1.6;
     const c = mesh(new THREE.CylinderGeometry(0, 0.25 + rand() * 0.15, h, 6), m, (rand() - 0.5) * 0.8, h / 2, (rand() - 0.5) * 0.8, root);
     c.rotation.set((rand() - 0.5) * 0.7, rand() * 3, (rand() - 0.5) * 0.7);
+    c.userData.noRefine = true; // Kristalle behalten bewusst ihre Facetten
   }
   addOutline(root, 0.03);
   return root;
@@ -537,8 +539,8 @@ export function createGrassTuft(rand, color = 0x5fae4a) {
 }
 
 export function createRock(rand, color = 0x9a98aa) {
-  const m = mesh(new THREE.DodecahedronGeometry(0.4 + rand() * 0.5, 0), toon(color));
-  m.scale.y = 0.6 + rand() * 0.4;
+  const m = mesh(pebble(0.4 + rand() * 0.5, rand() * 10), toon(color));
+  m.scale.y = 0.8 + rand() * 0.4;
   m.rotation.set(rand(), rand() * 3, rand());
   addOutline(m, 0.03);
   return m;
@@ -548,7 +550,7 @@ export function createSign() {
   const root = new THREE.Group();
   const w = toon(0x9a6438, { map: T.wood });
   mesh(new THREE.CylinderGeometry(0.07, 0.08, 1.1, 6), toon(0x6a3e22), 0, 0.55, 0, root);
-  mesh(new THREE.BoxGeometry(0.9, 0.5, 0.08), w, 0, 1.1, 0, root);
+  mesh(roundBox(0.9, 0.5, 0.08), w, 0, 1.1, 0, root);
   const q = mesh(new THREE.TorusGeometry(0.1, 0.03, 6, 12, Math.PI * 1.4), toon(0xfff1d6), 0, 1.15, 0.05, root); q.rotation.z = -0.6;
   mesh(new THREE.SphereGeometry(0.035, 6, 6), toon(0xfff1d6), 0, 0.97, 0.05, root);
   addOutline(root, 0.025);
@@ -556,11 +558,11 @@ export function createSign() {
 }
 
 export function createCrate() {
-  const g = new THREE.BoxGeometry(1.1, 1.1, 1.1);
+  const g = roundBox(1.1, 1.1, 1.1);
   const m = mesh(g, toon(0xc08850, { map: T.wood }));
   const bandM = toon(0x6a3e22);
   for (const r of [0, Math.PI / 2]) {
-    const b = mesh(new THREE.BoxGeometry(1.14, 0.14, 1.14), bandM, 0, 0, 0, m); b.rotation.x = r;
+    const b = mesh(roundBox(1.14, 0.14, 1.14), bandM, 0, 0, 0, m); b.rotation.x = r;
   }
   addOutline(m, 0.03);
   return m;
@@ -617,7 +619,7 @@ function hullGeometry(L, W, D) {
 // Stab zwischen zwei Punkten (Seile, Streben)
 function rod(a, b, r, mat, parent) {
   const d = new THREE.Vector3().subVectors(b, a), len = d.length();
-  const m = new THREE.Mesh(new THREE.CylinderGeometry(r, r, len, 6), mat);
+  const m = new THREE.Mesh(new THREE.CylinderGeometry(r, r, len, 10), mat);
   m.position.copy(a).addScaledVector(d, 0.5);
   m.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), d.normalize());
   m.castShadow = false;
@@ -679,7 +681,7 @@ export function createAirship(rand, hero = false) {
   }
   // Kajüte am Heck mit Dach, Fenster und Schornstein
   const hk = at(0.3);
-  const cab = new THREE.Mesh(new THREE.BoxGeometry(0.95, 0.55, 0.9), wood); cab.position.set(hk.x + 0.1, hk.sheer + 0.22, 0); cab.castShadow = true; ship.add(cab);
+  const cab = new THREE.Mesh(roundBox(0.95, 0.55, 0.9), wood); cab.position.set(hk.x + 0.1, hk.sheer + 0.22, 0); cab.castShadow = true; ship.add(cab);
   const roof = fin([[-0.62, 0], [0.62, 0], [0, 0.38]], 1.05, toon(0xb84a3a)); roof.rotation.y = 0;
   roof.position.set(hk.x + 0.1, hk.sheer + 0.5, 0); ship.add(roof);
   for (const sd of [1, -1]) { const win = new THREE.Mesh(new THREE.CircleGeometry(0.12, 16), glass); win.position.set(hk.x + 0.1, hk.sheer + 0.26, sd * 0.452); if (sd < 0) win.rotation.y = Math.PI; ship.add(win); }
@@ -743,7 +745,7 @@ export function createCloud(rand, color = 0xffffff, opacity = 0.95) {
   const geos = [];
   for (let i = 0; i < n; i++) {
     const r = 1 + rand() * 1.6;
-    const g = new THREE.SphereGeometry(r, 12, 10);
+    const g = new THREE.SphereGeometry(r, 26, 18);
     g.scale(1, 0.7, 1);
     g.translate((i - n / 2) * 1.4 + rand(), rand() * 0.8, (rand() - 0.5) * 1.5);
     geos.push(g);
@@ -793,9 +795,9 @@ export function createKey() {
   const root = new THREE.Group();
   const gm = toon(0xffd23f, { emissive: 0xffa000, ei: 0.5 });
   const ring = mesh(new THREE.TorusGeometry(0.28, 0.09, 8, 20), gm, 0, 0.35, 0, root);
-  mesh(new THREE.BoxGeometry(0.12, 0.7, 0.12), gm, 0, -0.2, 0, root);
-  mesh(new THREE.BoxGeometry(0.25, 0.1, 0.12), gm, 0.12, -0.45, 0, root);
-  mesh(new THREE.BoxGeometry(0.2, 0.1, 0.12), gm, 0.1, -0.25, 0, root);
+  mesh(roundBox(0.12, 0.7, 0.12), gm, 0, -0.2, 0, root);
+  mesh(roundBox(0.25, 0.1, 0.12), gm, 0.12, -0.45, 0, root);
+  mesh(roundBox(0.2, 0.1, 0.12), gm, 0.1, -0.25, 0, root);
   mesh(new THREE.SphereGeometry(0.1, 8, 6), toon(0x9ff4ff, { emissive: 0x5fd8ff, ei: 1 }), 0, 0.35, 0, root);
   addOutline(root, 0.03);
   root.add(glowSprite(0xffe066, 2.2, 0.7));
@@ -843,10 +845,10 @@ export function createGear(r = 2, color = 0xc9a24a) {
   const n = Math.round(r * 6);
   for (let i = 0; i < n; i++) {
     const a = i / n * Math.PI * 2;
-    const t = mesh(new THREE.BoxGeometry(r * 0.3, r * 0.3, r * 0.25), m, Math.cos(a) * r * 1.15, Math.sin(a) * r * 1.15, 0, root);
+    const t = mesh(roundBox(r * 0.3, r * 0.3, r * 0.25), m, Math.cos(a) * r * 1.15, Math.sin(a) * r * 1.15, 0, root);
     t.rotation.z = a;
   }
-  for (let i = 0; i < 3; i++) { const sp = mesh(new THREE.BoxGeometry(r * 2, r * 0.14, r * 0.12), m, 0, 0, 0, root); sp.rotation.z = i / 3 * Math.PI; }
+  for (let i = 0; i < 3; i++) { const sp = mesh(roundBox(r * 2, r * 0.14, r * 0.12), m, 0, 0, 0, root); sp.rotation.z = i / 3 * Math.PI; }
   addOutline(root, 0.04);
   return root;
 }
@@ -901,7 +903,7 @@ function bossEyes(parent, y, z, spread, size, pupil = 0xff3b5c) {
   for (const sx of [-1, 1]) {
     const e = mesh(S, toon(0xfff4d8), sx * spread, y, z, parent); e.scale.set(size, size * 1.15, size * 0.5);
     const p = mesh(S, basic(pupil), sx * spread * 0.96, y - size * 0.1, z + size * 0.42, parent); p.scale.setScalar(size * 0.42); p.userData.noOutline = true;
-    const b = mesh(new THREE.BoxGeometry(size * 2.1, size * 0.4, size * 0.4), toon(0x1a0f2a), sx * spread, y + size * 1.15, z + 0.05, parent); b.rotation.z = sx * 0.35; b.userData.noOutline = true;
+    const b = mesh(roundBox(size * 2.1, size * 0.4, size * 0.4), toon(0x1a0f2a), sx * spread, y + size * 1.15, z + 0.05, parent); b.rotation.z = sx * 0.35; b.userData.noOutline = true;
   }
 }
 
@@ -957,8 +959,8 @@ export function createCrystalBeast(cfg) {
 export function createSkyShip(cfg) {
   const root = new THREE.Group();
   const wood = toon(0x9a6438, { map: T.wood });
-  const hull = mesh(new THREE.BoxGeometry(5.5, 1.3, 2.4), wood, 0, 0, 0, root);
-  mesh(new THREE.BoxGeometry(1.2, 1.0, 2.0), wood, 2.9, 0.15, 0, root).rotation.z = 0.5;
+  const hull = mesh(roundBox(5.5, 1.3, 2.4), wood, 0, 0, 0, root);
+  mesh(roundBox(1.2, 1.0, 2.0), wood, 2.9, 0.15, 0, root).rotation.z = 0.5;
   const bal = mesh(new THREE.SphereGeometry(1, 24, 14), toon(0xffffff, { map: T.clothRed }), 0, 4.2, 0, root); bal.scale.set(3.6, 1.8, 1.9);
   for (const sx of [-1.6, 1.6]) mesh(new THREE.CylinderGeometry(0.05, 0.05, 2.6, 4), toon(0x3a2614), sx, 2.0, 0, root);
   const cannon = mesh(new THREE.CylinderGeometry(0.3, 0.38, 1.6, 12), toon(0x2a2a3a), 0.6, 0.6, 1.2, root); cannon.rotation.x = Math.PI / 2;
@@ -970,7 +972,7 @@ export function createSkyShip(cfg) {
   mesh(new THREE.CylinderGeometry(0.5, 0.6, 0.6, 14), toon(0x2a1a10), 0, 1.85, 0, cap);
   const beard = mesh(new THREE.SphereGeometry(0.5, 12, 8), toon(0xd8d0f0, { transparent: true, opacity: 0.85 }), 0, 0.35, 0.55, cap); beard.scale.set(1.2, 0.8, 0.6); beard.userData.noOutline = true;
   const prop = new THREE.Group(); prop.position.set(-3, 0.2, 0); root.add(prop);
-  for (let i = 0; i < 3; i++) { const p = mesh(new THREE.BoxGeometry(0.08, 1.4, 0.3), toon(0xe2b75e), 0, 0, 0, prop); p.rotation.x = i / 3 * Math.PI * 2; }
+  for (let i = 0; i < 3; i++) { const p = mesh(roundBox(0.08, 1.4, 0.3), toon(0xe2b75e), 0, 0, 0, prop); p.rotation.x = i / 3 * Math.PI * 2; }
   addOutline(hull, 0.05); addOutline(cb, 0.04);
   root.userData = { captain: cap, cannon, prop, mats: [capM] };
   return root;
@@ -981,16 +983,16 @@ export function createMagmaGolem(cfg) {
   const root = new THREE.Group(), body = new THREE.Group(); root.add(body);
   const m = toon(0x3a2424, { map: T.basalt, emissive: 0x401008, ei: 1, unique: true }); m.userData.baseEmissive = 0x401008;
   const glow = toon(0xffb02e, { emissive: 0xff6a1a, ei: 1 });
-  const torso = mesh(new THREE.DodecahedronGeometry(2.0, 1), m, 0, 3.2, 0, body); torso.scale.set(1, 1.15, 0.85);
+  const torso = mesh(pebble(2.0, 3.1), m, 0, 3.2, 0, body); torso.scale.set(1, 1.55, 0.85);
   const core = mesh(new THREE.SphereGeometry(0.6, 12, 8), glow, 0, 3.4, 1.55, body); core.add(glowSprite(0xff8a2a, 3, 0.7));
-  const head = mesh(new THREE.DodecahedronGeometry(0.95, 0), m, 0, 5.6, 0.2, body);
+  const head = mesh(pebble(0.95, 7.3), m, 0, 5.6, 0.2, body); head.scale.y = 1.3;
   bossEyes(body, 5.65, 0.95, 0.35, 0.2, 0xffd23f);
   for (const sx of [-1, 1]) { const h = mesh(new THREE.ConeGeometry(0.28, 1.1, 6), glow, sx * 0.7, 6.4, 0.1, body); h.rotation.z = -sx * 0.5; }
   for (const sx of [-1, 1]) mesh(new THREE.CylinderGeometry(0.6, 0.75, 1.6, 8), m, sx * 0.9, 0.8, 0, body);
   const fists = [];
   for (const sx of [-1, 1]) {
     const f = new THREE.Group(); root.add(f);
-    const fm = mesh(new THREE.DodecahedronGeometry(1.1, 1), m, 0, 0, 0, f);
+    const fm = mesh(pebble(1.1, 4.2 + sx), m, 0, 0, 0, f); fm.scale.y = 1.3;
     const knuckle = mesh(new THREE.SphereGeometry(0.45, 10, 8), glow, 0, -0.2, 0.75, f); knuckle.userData.noOutline = true;
     addOutline(fm, 0.05);
     f.position.set(sx * 3.6, 3.3, 0.6);
@@ -1011,8 +1013,8 @@ export function createFrostBoss(cfg) {
   for (let i = 0; i < 7; i++) { const a = i / 7 * Math.PI * 2; const c = mesh(new THREE.ConeGeometry(0.22, 1.1, 6), iceM, Math.cos(a) * 0.8, 3.45, Math.sin(a) * 0.8, body); c.rotation.z = -Math.cos(a) * 0.35; c.rotation.x = Math.sin(a) * 0.35; }
   const scarf = mesh(new THREE.TorusGeometry(1.25, 0.2, 8, 24), toon(0x2f7ad8), 0, 2.85, 0, body); scarf.rotation.x = Math.PI / 2;
   for (const sx of [-1, 1]) {
-    mesh(new THREE.BoxGeometry(0.5, 0.3, 1.1), toon(0x2a2a3a), sx * 0.7, 0.3, 0, body);
-    mesh(new THREE.BoxGeometry(0.08, 0.12, 1.5), toon(0xd8e8ff), sx * 0.7, 0.06, 0.1, body);
+    mesh(roundBox(0.5, 0.3, 1.1), toon(0x2a2a3a), sx * 0.7, 0.3, 0, body);
+    mesh(roundBox(0.08, 0.12, 1.5), toon(0xd8e8ff), sx * 0.7, 0.06, 0.1, body);
   }
   addOutline(b, 0.06);
   root.userData = { body, mats: [m] };

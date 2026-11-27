@@ -1,4 +1,4 @@
-// Grafikqualität: Niedrig / Mittel (Handy-Standard) / Hoch / Ultra (bis 4K)
+// Grafikqualität (PC): Niedrig / Mittel / Hoch / Ultra (bis 4K)
 // batch = Handy-Modus (eingefrorene Hintergrund-Inseln ohne Schatten). Verschmolzen wird auf allen Stufen – das Bild bleibt gleich.
 // modern = PC-Next-Gen-Renderer: PBR-Materialien mit Normal-Maps, Umgebungslicht (IBL) aus dem Himmel, Filmic-Tone-Mapping,
 //          Lichtstrahlen, Farbkorrektur, animiertes Gras. Ultra zusätzlich Ambient Occlusion (GTAO).
@@ -10,9 +10,10 @@ import { OutputPass } from 'three/examples/jsm/postprocessing/OutputPass.js';
 import { ShaderPass } from 'three/examples/jsm/postprocessing/ShaderPass.js';
 import { GTAOPass } from 'three/examples/jsm/postprocessing/GTAOPass.js';
 
+// PC-Version: alle Stufen nutzen den runden Next-Gen-Look. Niedrig/Mittel sind für schwächere PCs.
 export const PRESETS = {
-  low: { batch: true, light: false, aa: false, fx: 0.25, maxPR: 1, shadow: 512, soft: false, bloom: false, tex: 1, aniso: 2, fog: 1, shadowRange: 24 },
-  medium: { batch: true, light: false, aa: false, fx: 0.4, maxPR: 1.5, shadow: 1024, soft: false, bloom: false, tex: 1, aniso: 4, fog: 1, shadowRange: 22 },
+  low: { batch: true, light: false, aa: false, fx: 0.4, maxPR: 1, shadow: 1024, soft: false, bloom: true, tex: 1, aniso: 4, fog: 1.1, shadowRange: 28, modern: true, grass: 0.35 },
+  medium: { batch: false, light: true, aa: true, fx: 0.7, maxPR: 1.25, shadow: 2048, soft: true, bloom: true, tex: 2, aniso: 8, fog: 1.2, shadowRange: 32, modern: true, grass: 0.6, shafts: true },
   high: { batch: false, light: true, aa: true, fx: 1, maxPR: 1.5, shadow: 2048, soft: true, bloom: true, tex: 2, aniso: 8, fog: 1.25, shadowRange: 36, modern: true, grass: 1, shafts: true },
   ultra: { batch: false, light: true, aa: true, fx: 1.3, maxPR: '4k', shadow: 4096, soft: true, bloom: true, tex: 2, aniso: 16, fog: 1.45, shadowRange: 48, modern: true, grass: 2.2, shafts: true, ao: true },
 };
@@ -21,7 +22,7 @@ const KEY = 'lumi_gfx';
 
 export function loadPreset() {
   try { const s = localStorage.getItem(KEY); if (PRESETS[s]) return s; } catch (e) { /* egal */ }
-  return matchMedia('(pointer: coarse)').matches ? 'medium' : 'high';
+  return 'high';
 }
 export function savePreset(n) { try { localStorage.setItem(KEY, n); } catch (e) { /* egal */ } }
 

@@ -8,6 +8,8 @@ import { WORLDS } from './worlds.js';
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 import { generateLevel, generateKingdom } from './generator.js';
 import { Grass } from './grass.js';
+import * as SH from './shapes.js';
+import { QuestSystem } from './quests.js';
 
 const SURF = {
   grass: ['grass', 'dirt'], meadow: ['grassPlain', 'dirt'], stone: ['stone', 'stone'],
@@ -107,6 +109,7 @@ export class Level {
     this.bouncers = []; this.checkpoints = []; this.updrafts = []; this.firebars = []; this.hints = [];
     this.crates = []; this.anim = []; this.projectiles = [];
     this.grassAreas = []; this.grass = null;
+    this.courses = []; this.courseTag = null;
     this.goal = null; this.boss = null;
     this.spawnPoint = { x: 0, y: 0, z: 0, yaw: 0 };
     this.rand = rng(def.seed || 7);
@@ -114,6 +117,7 @@ export class Level {
     this.time = 0;
     this.sparkTotal = 0;
     this.mats = {};
+    this.quests = spec.kind === 'kingdom' ? new QuestSystem(this) : null;
     const T0 = performance.now();
     this.loadTimes = {};
     this.setupEnvironment();
@@ -276,20 +280,19 @@ export class Level {
   box(x, top, z, w, d, o = {}) {
     const h = o.h ?? 3;
     const s = this.surf(o.mat || 'grass');
-    const geo = new THREE.BoxGeometry(w, h, d);
+    const geo = SH.roundBox(w, h, d, Math.min(0.4, Math.min(w, d) * 0.12, h * 0.3));
     planarUV(geo, x, top - h / 2, z, o.tile ?? 4);
     const m = new THREE.Mesh(geo, [s.side, s.side, s.top, s.side, s.side, s.side]);
     m.position.set(x, top - h / 2, z);
     m.castShadow = true; m.receiveShadow = true;
     this.add(m); this.staticRoots.push(m);
-    if (GRASSY.has(o.mat || 'grass')) this.grassAreas.push({ kind: 'box', x, z, w, d, top, mesh: m });
+    if (GRASSY.has(o.mat || 'grass')) this.grassAreas.push({ kind: 'box', x, z, w: w - 0.5, d: d - 0.5, top, mesh: m });
     if (o.under !== false && !o.noUnder) {
       const uh = o.underH ?? Math.min(w, d) * 0.9;
-      const ug = new THREE.CylinderGeometry(1, 0.12, uh, 4, 1);
+      const ug = SH.rockUnder(1, uh, x * 0.37 + z * 0.71, 32, 4 / Math.max(w, d) * 2);
       const um = new THREE.Mesh(ug, s.side);
-      um.rotation.y = Math.PI / 4;
-      um.scale.set(w / Math.SQRT2, 1, d / Math.SQRT2);
-      um.position.set(x, top - h - uh / 2, z);
+      um.scale.set(w * 0.47, 1, d * 0.47);
+      um.position.set(x, top - h, z);
       this.add(um); this.staticRoots.push(um);
     }
     const c = boxCollider(x - w / 2, top - h, z - d / 2, x + w / 2, top, z + d / 2, { mesh: m, ice: !!o.ice });
@@ -302,19 +305,19 @@ export class Level {
   cyl(x, top, z, r, o = {}) {
     const h = o.h ?? 3;
     const s = this.surf(o.mat || 'grass');
-    const geo = new THREE.CylinderGeometry(r, r * (o.taper ?? 0.96), h, o.seg ?? Math.max(12, Math.round(r * 6)));
-    cylUV(geo, r, top - h / 2, x, z, o.tile ?? 4);
+    // runde Plattform mit abgerundeter Oberkante (nichts Kantiges mehr)
+    const { geo, bevel } = SH.roundPlatform(r, r * (o.taper ?? 0.96), h, o.seg ?? Math.max(28, Math.round(r * 8)), x, top - h / 2, z, o.tile ?? 4);
     const m = new THREE.Mesh(geo, [s.side, s.top, s.side]);
     m.position.set(x, top - h / 2, z);
     m.castShadow = true; m.receiveShadow = true;
     this.add(m); this.staticRoots.push(m);
-    if (GRASSY.has(o.mat || 'grass')) this.grassAreas.push({ kind: 'cyl', x, z, r, top, mesh: m });
+    if (GRASSY.has(o.mat || 'grass')) this.grassAreas.push({ kind: 'cyl', x, z, r: r - bevel + 0.05, top, mesh: m });
     if (o.under !== false) {
+      // organischer Fels unter der Insel statt Kegel
       const uh = o.underH ?? r * 1.4;
-      const ug = new THREE.CylinderGeometry(r * 0.94, r * 0.15, uh, Math.max(8, Math.round(r * 4)));
-      cylUV(ug, r, 0, 0, 0, 4);
+      const ug = SH.rockUnder(r * 0.94, uh, x * 0.37 + z * 0.71, Math.max(24, Math.round(r * 6)));
       const um = new THREE.Mesh(ug, s.side);
-      um.position.set(x, top - h - uh / 2, z);
+      um.position.set(x, top - h, z);
       this.add(um); this.staticRoots.push(um);
     }
     const c = cylCollider(x, z, r, top - h, top, { mesh: m, ice: !!o.ice });
@@ -487,7 +490,7 @@ export class Level {
       const e = this.enemy(types[i], p.x + Math.cos(a) * p.r * 0.45, p.y, p.z + Math.sin(a) * p.r * 0.45, { range: p.r * 0.35 });
       n.enemies.push(e);
     }
-    const flag = new THREE.Mesh(new THREE.ConeGeometry(0.6, 2.2, 6), M.toon(0x4a2f73, { emissive: 0x2a1048, ei: 1 }));
+    const flag = new THREE.Mesh(new THREE.ConeGeometry(0.6, 2.2, 24), M.toon(0x4a2f73, { emissive: 0x2a1048, ei: 1 }));
     flag.position.set(p.x, p.y + 1.1, p.z); this.add(flag);
     this.nests.push(n);
   }
@@ -581,9 +584,63 @@ export class Level {
 
   link(a, b, o = {}) { this.links.push({ a, b, o }); }
 
+  // ---------------- Herausforderungen direkt in der offenen Welt ----------------
+  courseBegin(k) { this.courseTag = k; this.courses[k] = { k, sparkTotal: 0, got: 0, gate: null, goal: null, par: 60, done: false }; return this.courses[k]; }
+  courseEnd() { this.courseTag = null; }
+
+  // Start-Tor: Bogen aus zwei Säulen mit Zielflaggen-Muster und Namensschild
+  courseGate(x, top, z, yaw, k, name, sub) {
+    const g = new THREE.Group(); g.position.set(x, top, z); g.rotation.y = yaw; this.add(g);
+    const col = 0x6fe8d8;
+    const pm = M.toon(0xfff1d6), cm = M.toon(col, { emissive: col, ei: 0.45 });
+    for (const sx of [-1.7, 1.7]) {
+      const p = new THREE.Mesh(new THREE.CylinderGeometry(0.22, 0.28, 3.4, 20), pm); p.position.set(sx, 1.7, 0); p.castShadow = true; g.add(p);
+      const b = new THREE.Mesh(new THREE.SphereGeometry(0.32, 20, 14), cm); b.position.set(sx, 3.5, 0); g.add(b);
+    }
+    const arch = new THREE.Mesh(new THREE.TorusGeometry(1.7, 0.16, 14, 48, Math.PI), cm); arch.position.y = 3.4; g.add(arch);
+    const flag = new THREE.Mesh(new THREE.PlaneGeometry(3.0, 0.5), new THREE.MeshBasicMaterial({ map: this.T.checker, side: THREE.DoubleSide }));
+    flag.position.y = 3.0; g.add(flag);
+    M.addOutline(g, 0.03);
+    this.label(name, sub, x, top + 5.6, z, '#6fe8d8');
+    this.colliders.push(cylCollider(x + Math.cos(yaw) * 1.7, z - Math.sin(yaw) * 1.7, 0.3, top, top + 3.4));
+    this.colliders.push(cylCollider(x - Math.cos(yaw) * 1.7, z + Math.sin(yaw) * 1.7, 0.3, top, top + 3.4));
+    this.courses[k].gate = { x, y: top, z };
+  }
+
+  // Ziel: Sockel, Lichtsäule und der Ziel-Mondsplitter der Herausforderung
+  courseGoal(x, top, z, k, flat = false) {
+    const ped = new THREE.Group();
+    const s = this.surf(this.def.goalMat || 'stone');
+    const ph = flat ? 0.08 : 0.6;
+    const base = new THREE.Mesh(new THREE.CylinderGeometry(flat ? 1.2 : 1.4, flat ? 1.25 : 1.7, ph, 32), s.side); base.position.y = ph / 2; base.castShadow = true; ped.add(base);
+    M.addOutline(ped, 0.04);
+    ped.position.set(x, top, z); this.add(ped);
+    if (!flat) this.colliders.push(cylCollider(x, z, 1.5, top, top + 0.6));
+    else top -= 0.5;
+    const beam = new THREE.Mesh(new THREE.CylinderGeometry(0.6, 0.6, 60, 24, 1, true), M.basic(0x9ff4ff, { transparent: true, opacity: 0.16, additive: true, side: THREE.DoubleSide }));
+    beam.position.set(x, top + 30, z); this.add(beam);
+    const ms = this.moon(x, top + 2.2, z, 'c' + k + 'g');
+    ms.mesh.scale.setScalar(1.5);
+    ms.beam = beam;
+    this.courses[k].goal = { x, y: top, z };
+  }
+
+  courseSpark(k) {
+    const c = this.courses[k], g = this.game;
+    if (!c) return;
+    c.got++;
+    if (c.done || c.got < c.sparkTotal) return;
+    c.done = true;
+    g.hud.toast(g.t('ui.moonstoneAll'), 3);
+    const p = g.player.pos;
+    this.spawnMoon(new THREE.Vector3(p.x, p.y + 2.6, p.z), 'c' + k + 'm2');
+  }
+
   // ---------------- Sammelobjekte ----------------
   spark(x, y, z) {
-    this.sparks.push({ pos: new THREE.Vector3(x, y, z), taken: false, base: y, ph: x * 0.3 + z * 0.2 });
+    const c = this.courseTag;
+    this.sparks.push({ pos: new THREE.Vector3(x, y, z), taken: false, base: y, ph: x * 0.3 + z * 0.2, course: c });
+    if (c !== null && this.courses[c]) this.courses[c].sparkTotal++;
     this.sparkTotal++;
   }
 
@@ -688,7 +745,7 @@ export class Level {
     const balls = [];
     const post = new THREE.Mesh(new THREE.CylinderGeometry(0.25, 0.35, 0.8, 8), M.toon(0x4a3a5e)); post.position.y = -0.4; piv.add(post);
     for (let i = 0; i < n; i++) {
-      const b = new THREE.Mesh(new THREE.IcosahedronGeometry(0.32, 0), m);
+      const b = new THREE.Mesh(new THREE.SphereGeometry(0.32, 20, 14), m);
       b.position.x = (i + 0.6) * (len / n);
       b.add(M.glowSprite(c, 1.5, 0.6));
       piv.add(b); balls.push(b);
@@ -767,10 +824,10 @@ export class Level {
   distantIsland(x, y, z, r, o = {}) {
     const s = this.surf(o.mat || 'grass');
     const g = new THREE.Group(); g.position.set(x, y, z); this.add(g);
-    const top = new THREE.Mesh(new THREE.CylinderGeometry(r, r * 0.95, r * 0.35, 14), [s.side, s.top, s.side]);
+    const top = new THREE.Mesh(SH.roundPlatform(r, r * 0.95, r * 0.35, 40, 0, 0, 0, 4).geo, [s.side, s.top, s.side]);
     g.add(top);
-    const under = new THREE.Mesh(new THREE.ConeGeometry(r * 0.93, r * 1.8, 12), s.side);
-    under.rotation.x = Math.PI; under.position.y = -r * 0.175 - r * 0.9; g.add(under);
+    const under = new THREE.Mesh(SH.rockUnder(r * 0.93, r * 1.8, x * 0.13 + z * 0.29, 40), s.side);
+    under.position.y = -r * 0.175; g.add(under);
     const n = o.trees ?? Math.round(r / 2);
     for (let i = 0; i < n; i++) {
       const a = this.rand() * 6.28, rr = this.rand() * r * 0.7;
@@ -899,12 +956,21 @@ export class Level {
     const pc = _pc.set(p.x, p.y + 0.6, p.z);
     // Crumble-Auslöser
     for (const cr of this.crumbles) if (cr.state === 'idle' && player.grounded && player.ground === cr.col) { cr.state = 'shaking'; cr.t = 0; }
+    // Start-Tore der Herausforderungen
+    for (const c of this.courses) {
+      if (!c || !c.gate) continue;
+      const gt = c.gate;
+      if (Math.abs(p.y - gt.y) < 2.5 && (p.x - gt.x) ** 2 + (p.z - gt.z) ** 2 < 2.2 * 2.2) g.startCourse(c.k);
+      const gl = c.goal;
+      if (gl && g.course && g.course.k === c.k && Math.abs(p.y - gl.y) < 3 && (p.x - gl.x) ** 2 + (p.z - gl.z) ** 2 < 2.4 * 2.4) g.finishCourse(c.k);
+    }
     // Funken
     for (const s of this.sparks) {
       if (s.taken) continue;
       if (s.pos.distanceToSquared(pc) < 1.1) {
         s.taken = true;
         g.addSparks(1, s.pos);
+        if (s.course !== null && s.course !== undefined) this.courseSpark(s.course);
       }
     }
     for (const h of this.hearts) {
@@ -943,7 +1009,7 @@ export class Level {
     }
     for (const ms of this.moonstones) {
       if (ms.taken) continue;
-      if (ms.pos.distanceToSquared(pc) < 1.6) { ms.taken = true; ms.mesh.visible = false; g.collectMoon(ms.id, ms.pos); }
+      if (ms.pos.distanceToSquared(pc) < 1.6) { ms.taken = true; ms.mesh.visible = false; if (ms.beam) ms.beam.visible = false; g.collectMoon(ms.id, ms.pos); }
     }
     for (const pc2 of this.pieces) {
       if (pc2.taken || pc2.pos.distanceToSquared(pc) > 1.4) continue;
@@ -1050,6 +1116,7 @@ export class Level {
   update(dt, player, camera) {
     const t = this.time;
     if (this.grass) this.grass.update(dt, player, camera);
+    if (this.quests && this.game.state !== 'test') this.quests.update(dt, player);
     this.sky.material.uniforms.time.value = t;
     for (const s of this.sparks) if (!s.taken) s.pos.y = s.base + Math.sin(t * 2 + s.ph) * 0.12;
     this.updateSparkInstances(t);

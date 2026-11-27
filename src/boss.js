@@ -414,8 +414,8 @@ class BeastBoss extends BossBase {
       const x = this.center.x + Math.cos(a) * 8, z = this.center.z + Math.sin(a) * 8;
       const g = new THREE.Group(); g.position.set(x, this.top, z); this.level.add(g);
       const cm = M.toon(0x9ff4ff, { emissive: 0x3fb8ff, ei: 0.5 });
-      const c = new THREE.Mesh(new THREE.CylinderGeometry(0.85, 1.1, 3.4, 6), cm); c.position.y = 1.7; c.castShadow = true; g.add(c);
-      const tip = new THREE.Mesh(new THREE.ConeGeometry(0.85, 1.2, 6), cm); tip.position.y = 4.0; g.add(tip);
+      const c = new THREE.Mesh(new THREE.CylinderGeometry(0.85, 1.1, 3.4, 6), cm); c.position.y = 1.7; c.castShadow = true; c.userData.noRefine = true; g.add(c);
+      const tip = new THREE.Mesh(new THREE.ConeGeometry(0.85, 1.2, 6), cm); tip.position.y = 4.0; tip.userData.noRefine = true; g.add(tip);
       M.addOutline(g, 0.05);
       const col = cylCollider(x, z, 1.0, this.top, this.top + 3.4);
       this.level.colliders.push(col);
@@ -524,7 +524,7 @@ class ShipBoss extends BossBase {
     const T = 1.3, grav = -18;
     const vel = new THREE.Vector3((target.x - cannon.x) / T, (target.y + 0.45 - cannon.y) / T - 0.5 * grav * T, (target.z - cannon.z) / T);
     const mesh = new THREE.Mesh(new THREE.SphereGeometry(0.5, 14, 10), M.toon(0x2a2a3a, { emissive: 0x000000, ei: 1, unique: true }));
-    const fuse = new THREE.Mesh(new THREE.CylinderGeometry(0.06, 0.06, 0.4, 6), M.toon(0xc8a060)); fuse.position.y = 0.6; mesh.add(fuse);
+    const fuse = new THREE.Mesh(new THREE.CylinderGeometry(0.06, 0.06, 0.4, 12), M.toon(0xc8a060)); fuse.position.y = 0.6; mesh.add(fuse);
     mesh.position.copy(cannon); this.level.add(mesh);
     this.game.audio.play('boom');
     this.game.particles.burst(cannon, { count: 8, color: [0xffffff, 0xd8d0f0], speed: 4, size: 1.2 });
@@ -822,7 +822,7 @@ class FrostBoss extends BossBase {
       this.marker(pt.x, this.top, pt.z, 1.2, 0x7fd8ff, warn + 0.1);
       const g = new THREE.Group(); g.position.copy(pt); g.visible = false; this.level.add(g);
       const cm = M.toon(0xe8f8ff, { emissive: 0x7fd8ff, ei: 0.5 });
-      for (let k = 0; k < 4; k++) { const c = new THREE.Mesh(new THREE.ConeGeometry(0.35, 2.1, 6), cm); c.position.set(Math.cos(k * 1.6) * 0.4, 1.05, Math.sin(k * 1.6) * 0.4); c.rotation.z = (k - 1.5) * 0.12; g.add(c); }
+      for (let k = 0; k < 4; k++) { const c = new THREE.Mesh(new THREE.ConeGeometry(0.35, 2.1, 18), cm); c.position.set(Math.cos(k * 1.6) * 0.4, 1.05, Math.sin(k * 1.6) * 0.4); c.rotation.z = (k - 1.5) * 0.12; g.add(c); }
       g.scale.y = 0.01;
       this.spikes.push({ mesh: g, x: pt.x, z: pt.z, t: 0, warn });
     }

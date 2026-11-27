@@ -53,9 +53,27 @@ Jeder Boss hat ein eigenes Modell, eigene Angriffe und eine eigene Schwachstelle
 Jede Welt ist ein frei begehbares **Reich**:
 - In der Mitte liegt eine **Hub-Insel** mit dem Luftschiff **Leuchtfeder**, der Händlerin, einem Glimmling, der sein Kuscheltier vermisst,
   dem **Nebeltor** zum Boss und einem goldenen **Bonustor**.
-- Vom Hub führen **5 Inselketten** in alle Richtungen. Jede hat eine Arena mit **Lichttor** zu einer Herausforderung und endet an einem **Gipfel**.
+- Vom Hub führen **5 lange Inselketten** in alle Richtungen, jede mit zwei Arenen, und sie enden an einem **Gipfel**.
+- **Herausforderungen direkt in der Welt, ohne Ladebildschirm:** An der ersten Arena jeder Kette steht ein **Start-Tor**.
+  Wer hindurchläuft, startet die Zeitmessung. Die Strecke führt seitlich hinaus zu einem **Ziel-Sockel** mit Mondsplitter.
+  Unterwegs gibt es zwei Geheimnisse, und für alle Funken der Strecke gibt es einen weiteren Splitter. Wer unter der Medaillenzeit bleibt, bekommt die Zeitmedaille.
+- **Quests:** In jedem Reich geben 6 Glimmlinge Aufträge (gelbes **!** über dem Kopf). Pro Reich sind es 6 von 8 Quest-Arten, jedes Reich in anderer Mischung:
 
-**Mondsplitter pro Reich: 47.** Insgesamt sind es **376**.
+| Quest | Aufgabe |
+|---|---|
+| Glühbeeren-Ernte | 6 Glühbeeren auf den Inseln einsammeln und zurückbringen |
+| Eilige Post | ein Paket zu einem anderen Glimmling tragen (bei Absturz fällt es zurück) |
+| Wettlauf | in begrenzter Zeit die goldene Flagge erreichen |
+| Funkenwusel-Jagd | einen flinken Funkenwusel dreimal fangen (am Rand in die Enge treiben) |
+| Nebel vertreiben | 5 Nebelwesen in einem Nebelnest besiegen |
+| Laternenfest | 4 Laternen anzünden, bevor die ersten wieder ausgehen |
+| Verirrte Kleine | 3 kleine Glimmlinge finden. Sie folgen Lumi und werden heimgebracht |
+| Aussichtspunkt | das Fernrohr auf einer hohen Wolkenplattform erreichen |
+
+  Eine Quest ist immer aktiv. Oben rechts steht das Ziel, und eine **goldene Lichtsäule** zeigt in der Welt, wohin es geht.
+  Das **Quest-Log** im Pausenmenü listet alle Quests des Reichs. Belohnung: je ein Mondsplitter und 25 Funken.
+
+**Mondsplitter pro Reich: 53.** Insgesamt sind es **424**.
 
 | Quelle | Anzahl |
 |---|---|
@@ -69,7 +87,8 @@ Jede Welt ist ein frei begehbares **Reich**:
 | Ringlauf um den Hub | 1 |
 | Händlerin (100 Funken) | 1 |
 | Nebelnest räumen | 1 |
-| 5 Herausforderungen hinter Lichttoren (Ziel, 2 Geheimnisse, alle Funken) | 20 |
+| 6 Quests | 6 |
+| 5 Herausforderungen in der Welt (Ziel, 2 Geheimnisse, alle Funken) | 20 |
 | Bonustor (braucht den Geheimschlüssel) | 4 |
 | Boss (großer Splitter) | 3 |
 
@@ -86,36 +105,41 @@ aus Bausteinen wie Sprungreihen, Treppen, Fahrstühlen, Aufwinden, Blinkplatten,
 
 Die Grafikstufe lässt sich im Haupt- und Pausenmenü umschalten.
 
+Das Spiel ist eine reine **PC-Version** (Tastatur, Maus, Gamepad). Alle Stufen nutzen den runden Next-Gen-Look, Niedrig und Mittel sind für schwächere PCs.
+
 | Stufe | Auflösung | Extras |
 |---|---|---|
-| Niedrig | 1× | weniger Deko, 1024er-Schatten |
-| Mittel (Standard auf Handys) | bis 1,5× | 1024er-Schatten, ohne Kantenglättung und Punktlicht |
-| Hoch (Standard auf dem PC) | bis 1,5× | **Next-Gen-Renderer** (siehe unten), animiertes 3D-Gras, 2048er-Schatten |
-| Ultra | **bis 3840×2160 (4K)**, auf kleineren Bildschirmen als Supersampling | Next-Gen + **Ambient Occlusion (GTAO)**, mehr als doppelt so dichtes Gras, 4096er-Schatten, mehr Deko und Partikel, weitere Sicht |
+| Niedrig | 1× | 1024er-Schatten, wenig Gras, Hintergrund-Inseln eingefroren |
+| Mittel | bis 1,25× | 2048er-Schatten, Gras, Lichtstrahlen |
+| Hoch (Standard) | bis 1,5× | animiertes 3D-Gras, 2048er-Schatten |
+| Ultra | **bis 3840×2160 (4K)**, auf kleineren Bildschirmen als Supersampling | + **Ambient Occlusion (GTAO)**, mehr als doppelt so dichtes Gras, 4096er-Schatten, mehr Deko und Partikel, weitere Sicht |
 
-**Next-Gen-Renderer (nur PC-Stufen Hoch und Ultra)**, die Handy-Stufen behalten den klassischen Toon-Look:
+**Next-Gen-Renderer (alle Stufen):**
 - **PBR-Materialien** (physikalisch basiert) mit Rauheit und Metall je Oberfläche: Eis und Kristalle glänzen, Metall spiegelt, Erde und Stein bleiben matt.
 - **Normal-Maps**, die beim Start aus den gemalten Texturen berechnet werden: Fugen, Risse, Maserung und Pflastersteine bekommen echte Tiefe im Licht.
 - **Image Based Lighting:** Der Himmel jeder Welt wird in eine Umgebungskarte gerendert. Daraus kommen weiches Rundum-Licht und Spiegelungen.
 - **Filmisches Tone-Mapping** (HDR) und **Farbkorrektur** mit Kontrast, Sättigung, Split-Toning, Vignette und dezenter chromatischer Aberration.
 - **Lichtstrahlen (God Rays)**, wenn man Richtung Sonne schaut, und HDR-Bloom auf allem, was leuchtet.
 - **Prozedurale Schichtwolken** am Himmel, die langsam ziehen, in der passenden Farbe jeder Welt.
-- **Animiertes 3D-Gras** auf allen Wiesen: Hunderttausende Halme mit Wind, Lumi drückt sie beim Durchlaufen zur Seite. In der Ferne blenden sie weich aus.
-- **Feinere Geometrie:** Runde Formen werden doppelt so fein unterteilt (glatte Silhouetten), dünnere Konturlinien, weichere Schatten mit größerer Reichweite.
+- **Animiertes 3D-Gras** auf allen Wiesen: Hunderttausende Halme mit Wind, Lumi drückt sie beim Durchlaufen zur Seite.
+- **Nichts Kantiges mehr:**
+  - Plattformen mit abgerundeter Oberkante, über die das Gras weich hinüberläuft.
+  - Bauchige, organisch verbeulte Felsen unter den schwebenden Inseln statt Kegeln und Pyramiden.
+  - Abgerundete Kisten, Brücken, Schilder und Blöcke, runde Kiesel statt Vielecke.
+  - Alle runden Formen sind fein unterteilt. Nur Kristalle behalten bewusst ihre Facetten.
 
 **Performance:** Unbewegliche Teile werden beim Laden pro Material zu großen Meshes verschmolzen (Static Batching in 60-m-Kacheln),
 Funken per Instancing gezeichnet und Figuren intern zusammengefasst. Das Bild bleibt dabei identisch, aber ein Reich braucht nur noch rund
-330 statt über 1000 Draw Calls. Auf dem PC schweben die Hintergrund-Inseln weiter und werfen Schatten, auf dem Handy sind sie eingefroren.
+330 statt über 1000 Draw Calls. Ab „Mittel“ schweben die Hintergrund-Inseln weiter und werfen Schatten, auf „Niedrig“ sind sie eingefroren.
 Dazu kommt eine **dynamische Auflösung**: Fällt die Bildrate unter etwa 50 FPS, sinkt die Renderauflösung schrittweise (bis 55 %) und steigt bei
 Luft wieder an. **F3** (oder das Menü) blendet eine FPS-Anzeige mit aktueller Auflösung ein.
 Alle Partikel (Schnee, Blasen, Funkeln, Staub) werden gebündelt als Punktwolken gezeichnet – wenige Draw Calls statt einem pro Partikel.
 In heißen Schleifen wird kein Speicher mehr pro Bild erzeugt (verhindert Ruckler durch Speicherbereinigung).
-**Handy-Stufen** verzichten zusätzlich auf Kantenglättung und Lumis Punktlicht, nutzen 1024er-Schatten ohne Weichzeichnung und weniger Umgebungspartikel.
 
 ## Qualitätssicherung
 
 Der Generator notiert jeden Sprung des Levels, auch die Wege zu allen Geheimnissen. Ein Test-Bot springt jeden einzelnen davon mit
-der echten Spielphysik nach (`__lumi.debugTestLevel(welt, level)` in der Browser-Konsole). Aktueller Stand: **1952 von 1952 Sprüngen in 8 Reichen und 56 Herausforderungen sind schaffbar.**
+der echten Spielphysik nach (`__lumi.debugTestLevel(welt, level)` in der Browser-Konsole). Aktueller Stand: **1314 von 1314 Sprüngen in den 8 Reichen (inklusive der 40 eingebauten Herausforderungen) sind schaffbar.** Ein zweiter Bot nimmt alle 48 Quests an und schließt sie ab.
 
 ## Steuerung
 
@@ -130,7 +154,6 @@ der echten Spielphysik nach (`__lumi.debugTestLevel(welt, level)` in der Browser
 | Pause | Esc / P | Start |
 | Ton an/aus | M | |
 
-Auf Handy und Tablet erscheinen Touch-Steuerelemente (Stick links, Knöpfe rechts, Kamera durch Wischen).
 
 **Speichern:** automatisch, ohne Speicherpunkte. Das Spiel speichert bei jedem Mondsplitter, Schlüssel, Boss, jeder Reise, alle 15 Sekunden und beim Schließen oder Minimieren des Fensters. Eine kleine Anzeige „💾 Gespeichert“ bestätigt das. Gespeichert wird im Browser (`localStorage`) bzw. im Profil der Desktop-App. „Fortsetzen“ im Titelmenü führt zurück ins zuletzt besuchte Reich.
 
@@ -159,6 +182,9 @@ node tools/store-art.cjs   # Store-Grafiken nach ./store
 | `src/generator.js` | prozeduraler Generator für Reiche (offene Welt) und Herausforderungen |
 | `src/gfx.js` | Grafikstufen, Bloom, 4K |
 | `src/levels.js` | handgebaute Level |
+| `src/quests.js` | Quest-System: 8 Quest-Arten, Auftraggeber, Ziele, Quest-Log |
+| `src/shapes.js` | runde Grundformen (Plattformen, Felsen, abgerundete Quader) |
+| `src/cutscene.js` | Cutscene-Regie zu allen Textboxen |
 | `src/boss.js` | 8 eigenständige Bosse (gemeinsame Basis + eigene Angriffe und Schwachstellen) |
 | `src/i18n/` | alle Texte in 6 Sprachen |
 | `src/models.js` | alle 3D-Modelle |

@@ -2,6 +2,7 @@
 // dazu Geheimnisse (Mondsteine, Schlüssel). Jeder Sprung wird als "link" für den automatischen Test notiert.
 import { rng } from './textures.js';
 import { WORLDS, KEY_LEVEL } from './worlds.js';
+import { QUEST_TYPES, QUESTS_PER_KINGDOM } from './quests.js';
 
 export function generateKingdom(L, spec) { generateLevel(L, spec); }
 
@@ -35,6 +36,15 @@ export function generateLevel(L, spec) {
     const n = Math.max(2, Math.ceil(Math.hypot(bx - ax, bz - az) / 2));
     for (let i = 0; i <= n; i++) placed.push({ x: ax + (bx - ax) * i / n, z: az + (bz - az) * i / n, r: rad, y: 0, obstacle: true });
   }
+  // führt der Sprung durch einen Aufwind? (würde Lumi nach oben reißen)
+  function crossesUpdraft(ax, az, bx, bz) {
+    for (const u of L.updrafts) {
+      const vx = bx - ax, vz = bz - az, l2 = vx * vx + vz * vz || 1;
+      const t = Math.max(0, Math.min(1, ((u.x - ax) * vx + (u.z - az) * vz) / l2));
+      if (Math.hypot(ax + vx * t - u.x, az + vz * t - u.z) < u.r + 1.0) return true;
+    }
+    return false;
+  }
   function edge(p, h, inset = 0.6) { const [dx, dz] = dir(h); return [p.x + dx * (p.r - inset), p.y, p.z + dz * (p.r - inset)]; }
 
   // Plattform-Typen
@@ -65,6 +75,7 @@ export function generateLevel(L, spec) {
       const x = from.x + dx * dist, z = from.z + dz * dist;
       if (!free(x, z, rad, from, o.margin ?? 2.2)) continue;
       if (o.extraCheck && !o.extraCheck(x, z, h)) continue;
+      if (crossesUpdraft(from.x, from.z, x, z)) continue;
       if (o.dry) return { x, y: top, z, r: rad, h };
       const p = makePlat(type, x, top, z, rad);
       const np = { x, y: top, z, r: rad, col: p.col, h };
@@ -391,6 +402,7 @@ export function generateLevel(L, spec) {
   const high = (reward) => {
     for (let tries = 0; tries < 8; tries++) {
       const a = anchor();
+      if (!a || a.r < 3.2) continue; // zu kleine Plattform: Sprungfeder würde mitten im Landepunkt stehen
       const ang = r() * 6.28;
       const bx = a.x + Math.cos(ang) * (a.r - 1.5), bz = a.z + Math.sin(ang) * (a.r - 1.5);
       const sx = a.x + Math.cos(ang) * (a.r + 4), sz = a.z + Math.sin(ang) * (a.r + 4);
@@ -468,6 +480,131 @@ export function generateLevel(L, spec) {
   }
 
 
+  // ================= Herausforderung als Teil der offenen Welt =================
+  // Startet an einer Arena der Inselkette, führt seitlich hinaus und endet an einem Ziel-Sockel.
+  function buildCourse(k, a) {
+    const g = L.game, w = spec.world;
+    const saved = { d, heading, baseH, spread, cur };
+    const sideBase = (k % 2 ? 1 : -1) * Math.PI / 2;
+    for (const sd of [sideBase, -sideBase, sideBase * 0.5, -sideBase * 0.5]) {
+      const hs = a.h + sd;
+      d = Math.min(1, w / 7 * 0.6 + k / 5 * 0.3); if (k === 0) d *= 0.7;
+      baseH = heading = hs; spread = 0.75; cur = a;
+      // passt die erste Plattform?
+      if (!place(R(2.2, 3), 0, 3, '', { dry: true })) continue;
+      const [dx, dz] = dir(hs);
+      const gx = a.x + dx * (a.r - 1.4), gz = a.z + dz * (a.r - 1.4);
+      const course = L.courseBegin(k);
+      L.courseGate(gx, a.y, gz, Math.atan2(dx, dz), k, g.t(`worlds.${w}.levels.${k}`), g.challengeSub(w, k));
+      const savedArenas = arenas.splice(0);
+      const len0 = pathLen, seg0 = segCount;
+      const nseg = 5 + Math.floor(w * 0.5) + k;
+      let prev = null, sinceCp = 0;
+      for (let i = 0; i < nseg; i++) {
+        if (sinceCp >= 3 && i < nseg - 1) { if (arena(true)) { sinceCp = 0; continue; } }
+        let n = chooseSeg(prev);
+        let ok = SEG[n]();
+        if (!ok) { n = 'hops'; ok = SEG.hops(); }
+        if (!ok) { heading = baseH; SEG.stairs(); }
+        prev = n; sinceCp++; segCount++;
+      }
+      const goal = place(R(2, 3), R(0, 1), 5, 'island') || place(R(1.8, 2.6), R(0, 0.6), 3.6, 'island');
+      const gp = goal || cur;
+      if (gp.h === undefined) gp.h = heading;
+      if (goal) {
+        L.courseGoal(gp.x, gp.y, gp.z, k);
+        // der letzte Sprung landet vor dem Sockel, nicht darauf
+        L.links[L.links.length - 1].b = [gp.x - dir(gp.h)[0] * 3, gp.y, gp.z - dir(gp.h)[1] * 3];
+      } else {
+        L.courseGoal(gp.x, gp.y, gp.z, k, true);
+      }
+      arenas.push(gp);
+      course.par = Math.round(12 + (pathLen - len0) / 6.2 + (segCount - seg0) * 2.5);
+      // zwei Geheimnisse entlang der Strecke
+      const moonAt = (id) => (p) => { L.moon(p.x, p.y + 1.4, p.z, id); L.sparkRing(p.x, p.y + 1.2, p.z, 1.2, 4); };
+      usedAnchors = new Set();
+      const m0 = 'c' + k + 'm0', m1 = 'c' + k + 'm1';
+      if (!branch(moonAt(m0)) && !high(moonAt(m0))) L.poundSpot(gp.x + 2.2, gp.y, gp.z, m0);
+      if (!branch(moonAt(m1), true) && !high(moonAt(m1))) L.poundSpot(gp.x - 2.2, gp.y, gp.z, m1);
+      L.courseEnd();
+      arenas.splice(0); arenas.push(...savedArenas);
+      ({ d, heading, baseH, spread, cur } = saved);
+      return true;
+    }
+    ({ d, heading, baseH, spread, cur } = saved);
+    return false;
+  }
+
+  // ================= Quests =================
+  function buildQuests(arenaA, arenaB, peaks) {
+    const w = spec.world;
+    const dist = (a, b) => Math.hypot(a.x - b.x, a.z - b.z);
+    // Auftraggeber: zwei auf der Hub-Insel, der Rest auf den mittleren Arenen der Inselketten
+    const givers = [{ x: 6.5, y: 0, z: 4.5, yaw: -2.2 }, { x: -5.5, y: 0, z: -7.5, yaw: 0.6 }];
+    for (const a of arenaB) {
+      const [dx, dz] = dir(a.h);
+      givers.push({ x: a.x - dx * 1.6, y: a.y, z: a.z - dz * 1.6, yaw: Math.atan2(-dx, -dz), arena: a });
+    }
+    // zu wenig mittlere Arenen? Dann Arenen der Herausforderungen, Gipfel und freie Plätze am Hub-Rand
+    for (const a of [...arenaA, ...peaks]) {
+      if (givers.length >= QUESTS_PER_KINGDOM + 2) break;
+      if (!a || givers.some((gq) => gq.arena === a)) continue;
+      const [dx, dz] = dir(a.h || 0), off = Math.min(1.6, Math.max(0, a.r - 1.2));
+      givers.push({ x: a.x - dx * off, y: a.y, z: a.z - dz * off, yaw: Math.atan2(-dx, -dz), arena: a });
+    }
+    for (const [hx, hz] of [[8.5, -9], [11.5, 6.5], [-12, -6], [4, -13]]) if (givers.length < QUESTS_PER_KINGDOM) givers.push({ x: hx, y: 0, z: hz, yaw: Math.atan2(-hx, -hz) });
+    // Hub-Auftraggeber zuerst, dann die weiter entfernten (abwechslungsreich verteilt)
+    givers.splice(QUESTS_PER_KINGDOM);
+    // Arten: alle 8 gemischt, pro Reich 6 davon (jedes Reich eine andere Mischung)
+    const types = QUEST_TYPES.slice();
+    for (let i = types.length - 1; i > 0; i--) { const j = Math.floor(r() * (i + 1)); [types[i], types[j]] = [types[j], types[i]]; }
+    const plats = placed.filter((q) => !q.obstacle && q !== start && q.r >= 1.3 && q.r <= 4.5 && q.y > minY);
+    const bigArenas = [...arenaA, ...arenaB].filter(Boolean);
+    const usedAreas = new Set();
+    const pickArena = (from, minD) => {
+      const c = bigArenas.filter((a) => !usedAreas.has(a) && dist(a, from) > minD).sort((a, b) => dist(a, from) - dist(b, from));
+      const a = c[0] || bigArenas.find((x) => !usedAreas.has(x)) || bigArenas[0];
+      if (a) usedAreas.add(a);
+      return a;
+    };
+    const spotsNear = (from, n, minD, maxD) => {
+      const c = plats.filter((q) => { const d = dist(q, from); return d > minD && d < maxD; }).sort((a, b) => dist(a, from) - dist(b, from));
+      const out = [];
+      for (let k = 0; k < c.length && out.length < n; k += Math.max(1, Math.floor(c.length / n))) out.push(c[k]);
+      for (const q of plats) { if (out.length >= n) break; if (!out.includes(q)) out.push(q); }
+      return out.slice(0, n);
+    };
+    for (let i = 0; i < QUESTS_PER_KINGDOM; i++) {
+      const type = types[i], gv = givers[i];
+      const o = { giver: gv };
+      if (gv.arena) usedAreas.add(gv.arena);
+      if (type === 'collect') o.spots = spotsNear(gv, 6, 6, 70).map((q) => ({ x: q.x + R(-0.5, 0.5), y: q.y, z: q.z + R(-0.5, 0.5) }));
+      else if (type === 'lanterns') {
+        o.spots = spotsNear(gv, 4, 5, 32).map((q) => { const a = r() * 6.28, rr = Math.max(0, q.r - 1); return { x: q.x + Math.cos(a) * rr, y: q.y, z: q.z + Math.sin(a) * rr }; });
+        o.limit = 40 + Math.round(Math.max(...o.spots.map((p) => dist(p, gv))) * 0.9);
+      } else if (type === 'lost') o.spots = spotsNear(gv, 3, 18, 90).map((q) => ({ x: q.x, y: q.y, z: q.z }));
+      else if (type === 'deliver' || type === 'race') {
+        const a = pickArena(gv, type === 'race' ? 30 : 45);
+        const [dx, dz] = dir(a.h || 0);
+        o.target = { x: a.x + dz * 2, y: a.y, z: a.z - dx * 2, yaw: 0 };
+        if (type === 'race') o.limit = Math.round(25 + dist(a, gv) * 0.6);
+      } else if (type === 'catch' || type === 'defeat') {
+        const a = pickArena(gv, 20);
+        o.area = { x: a.x, y: a.y, z: a.z, r: a.r };
+      } else if (type === 'view') {
+        // Aussichtspunkt hoch über einer Arena (Sprungfeder → Wolkenplattform), sonst ein Gipfel
+        let pos = null;
+        usedAnchors = new Set();
+        const saveArenas = arenas.splice(0); arenas.push(...bigArenas.filter((a) => !usedAreas.has(a)));
+        if (arenas.length) high((p) => { pos = p; });
+        arenas.splice(0); arenas.push(...saveArenas);
+        if (!pos && peaks.length) { const pk = peaks[i % peaks.length]; pos = { x: pk.x + 1.2, y: pk.y, z: pk.z }; }
+        o.target = pos || { x: gv.x + 3, y: gv.y, z: gv.z };
+      }
+      L.quests.add(i, type, o);
+    }
+  }
+
   // ================= Offene Welt: ein ganzes Reich =================
   function buildKingdom() {
     const g = L.game, w = spec.world;
@@ -505,19 +642,21 @@ export function generateLevel(L, spec) {
     const H = [-2.35, -1.2, 0, 1.2, 2.35];
     spread = 0.5;
     const spokeArenas = [];
+    const spokeArenas2 = [];
+    const peaks = [];
+    const courseAt = [];
     for (let k = 0; k < 5; k++) {
       baseH = heading = H[k]; cur = start;
-      const n1 = 2 + Math.floor(r() * 2);
+      const n1 = 3 + Math.floor(r() * 2);
       for (let i = 0; i < n1; i++) { const nm = chooseSeg(); if (!SEG[nm]()) SEG.hops(); }
       let a = arena(true);
       if (!a) { SEG.hops(); a = arena(true); }
-      if (a) {
-        spokeArenas.push(a);
-        const pa = a.h + Math.PI / 2 * (k % 2 ? 1 : -1);
-        const px = a.x + Math.cos(pa) * 0 + Math.sin(pa) * (a.r - 2.6), pz = a.z - Math.cos(pa) * (a.r - 2.6);
-        L.portal(px, a.y, pz, Math.atan2(a.x - px, a.z - pz), { type: 'challenge', i: k }, g.t(`worlds.${w}.levels.${k}`), g.challengeSub(w, k), false);
-      }
+      if (a) { spokeArenas.push(a); courseAt[k] = a; }
+      // zweite Arena unterwegs (Platz für Quests und Gegner), dann weiter zum Gipfel
       const n2 = 2 + Math.floor(r() * 2);
+      for (let i = 0; i < n2; i++) { const nm = chooseSeg(); if (!SEG[nm]()) SEG.hops(); }
+      const a2 = arena(true);
+      if (a2) { spokeArenas2.push(a2); }
       for (let i = 0; i < n2; i++) { const nm = chooseSeg(); if (!SEG[nm]()) SEG.hops(); }
       // Gipfel
       SEG.stairs();
@@ -526,9 +665,10 @@ export function generateLevel(L, spec) {
       L.moon(top.x, top.y + 1.5, top.z, 'peak' + k);
       L.sparkRing(top.x, top.y + 1.2, top.z, 1.4, 5);
       L.label(g.t('ui.peak'), '', top.x, top.y + 4.2, top.z);
-      if (peak) arenas.push(peak);
+      if (peak) { arenas.push(peak); peaks.push(peak); }
     }
     for (const a of spokeArenas) arenas.push(a);
+    for (const a of spokeArenas2) arenas.push(a);
 
     // ---- Mondsplitter-Verstecke ----
     const moonAt = (id) => (p) => { L.moon(p.x, p.y + 1.4, p.z, id); L.sparkRing(p.x, p.y + 1.2, p.z, 1.2, 4); };
@@ -560,15 +700,30 @@ export function generateLevel(L, spec) {
       for (let i = 0; i < 5; i++) { const q = cands[Math.floor(r() * cands.length)]; if (q) L.piece(q.x, q.y + 1.3, q.z); }
       L.piecesMoon = { pos: { x: 0, y: 2.5, z: 0 }, id: 'pieces' };
     }
+
+    // ---- Quests: sechs Auftraggeber mit verschiedenen Aufgaben ----
+    if (L.quests) buildQuests(spokeArenas, spokeArenas2, peaks);
+
+    // ---- fünf Herausforderungen direkt in der Welt (ohne Ladebildschirm) ----
+    for (let k = 0; k < 5; k++) {
+      const a = courseAt[k];
+      if (!a || !buildCourse(k, a)) {
+        // kein Platz: wie früher ein Lichttor zur eigenen Herausforderung
+        const ar = a || start;
+        const pa = (ar.h || 0) + Math.PI / 2 * (k % 2 ? 1 : -1);
+        const px = ar.x + Math.sin(pa) * (ar.r - 2.6), pz = ar.z - Math.cos(pa) * (ar.r - 2.6);
+        L.portal(px, ar.y, pz, Math.atan2(ar.x - px, ar.z - pz), { type: 'challenge', i: k }, g.t(`worlds.${w}.levels.${k}`), g.challengeSub(w, k), false);
+      }
+    }
   }
 
   // ---------------- Kulisse ----------------
   if (kind === 'kingdom') {
     for (let i = 0; i < 10; i++) {
-      const a = i / 10 * Math.PI * 2 + r() * 0.4, rr = R(150, 210);
+      const a = i / 10 * Math.PI * 2 + r() * 0.4, rr = R(280, 360);
       L.distantIsland(Math.cos(a) * rr, R(-15, 35), Math.sin(a) * rr, R(9, 16), { mat: S.big, kind: S.islandKind, trees: 4 + Math.floor(r() * 4) });
     }
-    L.clouds(22, 0, 0, 420, -28, -10, W.theme.cloud, W.id === 'coral' ? 0.5 : 0.9);
+    L.clouds(30, 0, 0, 700, -28, -10, W.theme.cloud, W.id === 'coral' ? 0.5 : 0.9);
   } else {
     const islands = 4 + Math.floor(r() * 3);
     for (let i = 0; i < islands; i++) {
