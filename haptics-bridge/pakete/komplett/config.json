@@ -1,0 +1,74 @@
+{
+  "intifaceUrl": "ws://127.0.0.1:12345",
+  "autoUpdate": true,
+  "port": 3110,
+  "maxIntensity": 0.8,
+  "devices": [],
+  "events": {
+    "damage": {
+      "intensity": 0.9,
+      "minIntensity": 0.3,
+      "durationMs": 800,
+      "minDurationMs": 250,
+      "fadeMs": 250
+    },
+    "death": {
+      "intensity": 1.0,
+      "durationMs": 2000,
+      "fadeMs": 800
+    },
+    "bs_hit": {
+      "intensity": 0.25,
+      "durationMs": 70,
+      "fadeMs": 30,
+      "log": false
+    },
+    "bs_miss": {
+      "intensity": 0.6,
+      "durationMs": 250,
+      "fadeMs": 100,
+      "log": false
+    },
+    "bs_bomb": {
+      "intensity": 0.85,
+      "durationMs": 400,
+      "fadeMs": 150
+    },
+    "bs_clear": {
+      "intensity": 0.7,
+      "durationMs": 1500,
+      "fadeMs": 600
+    }
+  },
+  "lowHealth": {
+    "enabled": true,
+    "threshold": 0.3,
+    "intensity": 0.3,
+    "periodMs": 1100
+  },
+  "beatsaber": {
+    "enabled": true,
+    "wallIntensity": 0.5,
+    "comboLevel": {
+      "enabled": false,
+      "max": 0.2,
+      "at": 200
+    }
+  },
+  "gmod": {
+    "enabled": true,
+    "file": "{steam:GarrysMod}/garrysmod/data/haptics_bridge.txt"
+  },
+  "games": {
+    "cs2": false,
+    "dota2": false
+  },
+  "vrchat": {
+    "enabled": false
+  },
+  "logWatchers": [],
+  "vest": {
+    "enabled": false,
+    "maxIntensity": 0.8
+  }
+}

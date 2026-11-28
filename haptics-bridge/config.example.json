@@ -1,0 +1,124 @@
+{
+  "intifaceUrl": "ws://127.0.0.1:12345",
+  "autoUpdate": true,
+  "port": 3110,
+  "token": "",
+  "maxIntensity": 0.8,
+  "devices": [],
+  "events": {
+    "damage": {
+      "intensity": 0.9,
+      "minIntensity": 0.25,
+      "durationMs": 700,
+      "minDurationMs": 250,
+      "fadeMs": 250,
+      "referenceMax": 100
+    },
+    "death": {
+      "intensity": 1.0,
+      "durationMs": 2000,
+      "fadeMs": 800
+    },
+    "hit": {
+      "intensity": 0.35,
+      "durationMs": 150,
+      "fadeMs": 80
+    },
+    "bs_hit": {
+      "intensity": 0.25,
+      "durationMs": 70,
+      "fadeMs": 30,
+      "log": false
+    },
+    "bs_miss": {
+      "intensity": 0.6,
+      "durationMs": 250,
+      "fadeMs": 100,
+      "log": false
+    },
+    "bs_bomb": {
+      "intensity": 0.85,
+      "durationMs": 400,
+      "fadeMs": 150
+    },
+    "bs_clear": {
+      "intensity": 0.7,
+      "durationMs": 1500,
+      "fadeMs": 600
+    }
+  },
+  "lowHealth": {
+    "enabled": true,
+    "threshold": 0.3,
+    "intensity": 0.3,
+    "periodMs": 1100
+  },
+  "games": {
+    "cs2": true,
+    "dota2": true
+  },
+  "logWatchers": [
+    {
+      "name": "Minecraft-Tod",
+      "enabled": false,
+      "file": "C:/Users/DEINNAME/AppData/Roaming/.minecraft/logs/latest.log",
+      "rules": [
+        {
+          "match": "\\[CHAT\\] DEIN_SPIELERNAME (was|died|drowned|fell|burned|blew|hit the ground|went up|tried to swim|froze|starved|suffocated|withered|experienced)",
+          "event": "death"
+        }
+      ]
+    }
+  ],
+  "vrchat": {
+    "enabled": false,
+    "port": 9001,
+    "logUnknown": true,
+    "params": [
+      {
+        "name": "Haptics_Touch",
+        "mode": "level",
+        "scale": 1.0
+      },
+      {
+        "name": "Haptics_Hit",
+        "mode": "trigger",
+        "event": "hit",
+        "threshold": 0.5
+      }
+    ]
+  },
+  "beatsaber": {
+    "enabled": false,
+    "dataPuller": "ws://127.0.0.1:2946/BSDataPuller",
+    "httpStatus": "ws://127.0.0.1:6557/socket",
+    "wallIntensity": 0.5,
+    "comboLevel": {
+      "enabled": false,
+      "max": 0.2,
+      "at": 200
+    }
+  },
+  "gmod": {
+    "enabled": false,
+    "file": "{steam:GarrysMod}/garrysmod/data/haptics_bridge.txt"
+  },
+  "vest": {
+    "enabled": false,
+    "url": "ws://127.0.0.1:15881/v2/feedbacks",
+    "maxIntensity": 0.8,
+    "heartDots": [
+      1,
+      5
+    ],
+    "patterns": {
+      "damage": "burst",
+      "death": "death",
+      "hit": "burst",
+      "bs_hit": "tap",
+      "bs_miss": "side",
+      "bs_bomb": "burst",
+      "bs_clear": "wave"
+    }
+  }
+}

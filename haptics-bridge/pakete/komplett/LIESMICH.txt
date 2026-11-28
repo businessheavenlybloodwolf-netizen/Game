@@ -1,0 +1,126 @@
+﻿HAPTICS BRIDGE: MINECRAFT, BEAT SABER, GARRY'S MOD
+==================================================
+
+Dein Gerät (über Intiface Central) und/oder deine bHaptics-Weste vibrieren passend zum Spiel.
+Alle drei Spiele laufen mit derselben HapticsBridge.exe, du musst nichts umstellen.
+
+
+AUTO-UPDATE
+-----------
+
+HapticsBridge.exe schaut bei jedem Start, ob es eine neue Version gibt, und installiert sie
+selbst. Deine config.json bleibt dabei unverändert. Ist die Minecraft-Mod oder das GMod-Addon
+installiert, werden die gleich mit aktualisiert. Jede Datei wird vor der Installation mit der
+Prüfsumme von GitHub verglichen.
+Ausschalten: in config.json "autoUpdate": false setzen.
+
+
+GRUNDLAGE (EINMALIG)
+--------------------
+
+1. Intiface Central installieren: https://intiface.com/central/
+
+
+JEDES MAL ZUM SPIELEN
+---------------------
+
+1. Intiface Central starten, "Start Server" drücken und dein Gerät verbinden.
+2. HapticsBridge.exe doppelklicken. Das schwarze Fenster offen lassen.
+   Dort sollte stehen: "Intiface verbunden" und "Gerät bereit: ...".
+3. Spiel starten.
+
+Beim ersten Start warnt Windows eventuell ("Der Computer wurde durch Windows geschützt"),
+weil die .exe nicht signiert ist. Dann auf "Weitere Informationen" und "Trotzdem ausführen" klicken.
+Zum Beenden das Fenster schließen oder Strg+C drücken.
+
+
+HAPTIK-WESTE (bHaptics)
+-----------------------
+
+Unterstützt: bHaptics TactSuit (X16, X40, Pro), Tactosy-Arme und Tactal (Kopf).
+
+1. bHaptics Player (bzw. "bHaptics Hub") am PC installieren und die Weste dort koppeln.
+2. In config.json bei "vest" "enabled": true setzen.
+3. HapticsBridge.exe neu starten. Im Fenster steht "bHaptics Player verbunden" und welche
+   Geräte verbunden sind.
+
+So fühlt es sich an:
+  Schaden            ganze Weste und Arme, je nach Stärke
+  Tod                drei starke Stöße (mit Tactal auch am Kopf)
+  Wenig Leben        Herzschlag links auf der Brust
+  Beat Saber         Treffer links/rechts auf der Seite und dem Arm des jeweiligen Säbels,
+                     Wände dauerhaft, Level geschafft als Welle von unten nach oben
+
+Nur Weste, ohne Intiface: in config.json "intifaceUrl": "" setzen.
+Weste stärker/schwächer: "vest": { "maxIntensity": 0.8 } (0 bis 1).
+
+
+BEAT SABER (PC-Version, auch über Virtual Desktop)
+--------------------------------------------------
+
+Was vibriert: jeder Treffer kurz, Fehler stärker, Bomben stark, in Wänden dauerhaft,
+Level geschafft (langer Puls), Level verloren (sehr langer Puls), bei wenig Energie ein Herzschlag.
+
+Einrichten:
+1. BSManager (https://github.com/Zagrios/bs-manager) oder ModAssistant installieren.
+2. Damit die Mod "DataPuller" installieren. Alternativ geht auch "HttpSiraStatus".
+   Hinweis: Mods gibt es oft erst einige Wochen nach einem Beat-Saber-Update. BSManager kann
+   eine ältere, gemoddete Version neben der aktuellen installieren.
+3. Beat Saber über BSManager bzw. Steam starten. Im Fenster der Bridge erscheint
+   "[Beat Saber] verbunden mit DataPuller".
+
+Combo-Summen: In config.json unter "comboLevel" "enabled": true setzen. Dann summt es leicht
+stärker, je höher deine Combo ist.
+
+
+GARRY'S MOD
+-----------
+
+Was vibriert: Schaden je nach Stärke, Tod, bei wenig Leben ein Herzschlag.
+Funktioniert im Einzelspieler und auf Servern, die du selbst im Spiel startest
+("Neues Spiel" mit mehreren Spielern). Auf fremden Servern geht es nicht, weil GMod dort nur
+die Skripte des Servers erlaubt.
+
+Einrichten:
+1. Den Ordner "garrysmod\addons\haptics_bridge" aus dieser ZIP kopieren nach:
+      ...\Steam\steamapps\common\GarrysMod\garrysmod\addons\
+   (In Steam: Rechtsklick auf Garry's Mod > Verwalten > Lokale Dateien durchsuchen.)
+2. Fertig. Die Bridge findet den Steam-Ordner selbst, auch auf anderen Laufwerken.
+
+
+MINECRAFT (Java 1.21.1, Fabric)
+-------------------------------
+
+Was vibriert: Schaden je nach Stärke, Tod, unter 3 Herzen ein Herzschlag.
+
+Einrichten:
+1. Fabric für Minecraft 1.21.1 installieren: https://fabricmc.net/use/installer/
+   ("Client", Version 1.21.1, "Installieren").
+2. Alles aus "minecraft\mods" in dieser ZIP kopieren nach:
+      %AppData%\.minecraft\mods
+   (Win+R, %AppData%\.minecraft eingeben, Enter. Den Ordner "mods" ggf. anlegen.)
+3. Minecraft mit dem Profil "fabric-loader-1.21.1" starten.
+
+
+EINSTELLEN (config.json, mit dem Editor öffnen)
+-----------------------------------------------
+
+  "maxIntensity": 0.8     Höchste Stärke (0 bis 1). Zu stark? Kleiner machen.
+  "damage"                Schaden in Minecraft und GMod: "minIntensity" bei wenig, "intensity" bei viel Schaden.
+  "bs_hit"                Beat Saber Treffer. "intensity": 0 schaltet die Treffer-Vibration aus.
+  "bs_miss", "bs_bomb"    Beat Saber Fehler und Bomben.
+  "wallIntensity"         Beat Saber Wände.
+  "lowHealth"             Herzschlag bei wenig Leben. "enabled": false schaltet ihn aus.
+  "devices": ["Lush"]     Nur bestimmte Geräte ansteuern (Teil des Namens). Leer heißt alle.
+
+Nach einer Änderung HapticsBridge.exe neu starten.
+
+
+PROBLEME
+--------
+
+"Intiface nicht erreichbar"      Intiface Central läuft nicht oder "Start Server" wurde nicht gedrückt.
+"Port 3110 ist schon belegt"     Die Bridge läuft schon in einem anderen Fenster.
+Beat Saber verbindet nicht       DataPuller nicht installiert, oder die Mod passt nicht zur Beat-Saber-Version.
+GMod: "Datei (noch) nicht da"    Das Addon ist nicht im addons-Ordner, oder es wurde noch keine Karte gestartet.
+                                 In der GMod-Konsole (Taste ^) muss "[Haptics Bridge] aktiv" stehen.

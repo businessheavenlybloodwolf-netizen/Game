@@ -1,0 +1,131 @@
+name: Haptics-Bridge-Paket bauen und veröffentlichen
+
+on:
+  push:
+    paths: ['haptics-bridge/**', '.github/workflows/haptics-release.yml']
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  mod:
+    name: Mod bauen
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: haptics-bridge/minecraft-mod
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.12'
+      - run: gradle build --no-daemon
+      - name: Mod und Fabric API einsammeln
+        run: |
+          mkdir -p ../../out/mods
+          cp build/libs/*.jar ../../out/mods/
+          rm -f ../../out/mods/*-sources.jar
+          FABRIC=$(grep '^fabric_version=' gradle.properties | cut -d= -f2)
+          ENC=${FABRIC//+/%2B}
+          curl -fsSL -o "../../out/mods/fabric-api-${FABRIC}.jar" \
+            "https://maven.fabricmc.net/net/fabricmc/fabric-api/fabric-api/${ENC}/fabric-api-${ENC}.jar"
+          ls -l ../../out/mods
+      - uses: actions/upload-artifact@v4
+        with:
+          name: mods
+          path: out/mods/*.jar
+
+  package:
+    name: Windows-Paket bauen und testen
+    needs: mod
+    runs-on: windows-latest
+    defaults:
+      run:
+        shell: pwsh
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - uses: actions/download-artifact@v4
+        with:
+          name: mods
+          path: pkg/minecraft/mods
+
+      - name: Bridge zu HapticsBridge.exe bauen
+        run: |
+          npx --yes esbuild@0.24.2 haptics-bridge/bridge.mjs --bundle --platform=node --format=cjs --target=node22 --outfile=build/bridge.cjs
+          '{"main":"build/bridge.cjs","output":"build/prep.blob","disableExperimentalSEAWarning":true}' | Set-Content sea.json
+          node --experimental-sea-config sea.json
+          Copy-Item (Get-Command node).Source pkg/HapticsBridge.exe
+          npx --yes postject@1.0.0-alpha.6 pkg/HapticsBridge.exe NODE_SEA_BLOB build/prep.blob --sentinel-fuse NODE_SEA_FUSE_fce680ab2cc467b6e072b8b5df1996b2
+          Copy-Item haptics-bridge/pakete/komplett/config.json, haptics-bridge/pakete/komplett/LIESMICH.txt pkg/
+          New-Item -ItemType Directory -Force pkg/garrysmod/addons | Out-Null
+          Copy-Item -Recurse haptics-bridge/gmod-addon/haptics_bridge pkg/garrysmod/addons/
+
+      - name: HapticsBridge.exe testen
+        run: |
+          $p = Start-Process pkg/HapticsBridge.exe -ArgumentList '--dry' -WorkingDirectory $env:TEMP -PassThru -NoNewWindow -RedirectStandardOutput out.txt -RedirectStandardError err.txt
+          Start-Sleep 3
+          $r = Invoke-RestMethod -Uri http://127.0.0.1:3110/event -Method Post -ContentType 'application/json' -Body '{"type":"damage","amount":6,"max":20,"source":"Minecraft"}'
+          Start-Sleep 1
+          Stop-Process $p
+          Get-Content out.txt, err.txt
+          if (-not $r.ok) { throw 'Event wurde nicht angenommen' }
+          if (-not (Select-String out.txt -Pattern 'Konfiguration geladen' -Quiet)) { throw 'config.json neben der .exe wurde nicht gefunden' }
+          if (-not (Select-String out.txt -Pattern '\[Minecraft\] damage' -Quiet)) { throw 'Schaden kam nicht an' }
+          if (-not (Select-String out.txt -Pattern '\[Beat Saber\] warte' -Quiet)) { throw 'Beat-Saber-Adapter nicht gestartet' }
+          if (-not (Select-String out.txt -Pattern "\[Garry's Mod\]" -Quiet)) { throw 'GMod-Adapter nicht gestartet' }
+          Get-ChildItem -Recurse pkg | Select-Object FullName, Length
+
+      - name: ZIP packen und Update-Dateien bereitlegen
+        run: |
+          Compress-Archive -Path pkg/* -DestinationPath HapticsBridge.zip
+          New-Item -ItemType Directory -Force upd | Out-Null
+          Copy-Item pkg/HapticsBridge.exe, pkg/garrysmod/addons/haptics_bridge/lua/autorun/server/haptics_bridge.lua upd/
+          Copy-Item pkg/minecraft/mods/haptics-bridge-minecraft-*.jar upd/
+          $v = (Get-Content haptics-bridge/package.json -Raw | ConvertFrom-Json).version
+          "VERSION=$v" >> $env:GITHUB_ENV
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: HapticsBridge
+          path: HapticsBridge.zip
+
+      - name: Release veröffentlichen
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: haptics-v${{ env.VERSION }}
+          target_commitish: ${{ github.sha }}
+          name: Haptics Bridge ${{ env.VERSION }}
+          make_latest: true
+          files: |
+            HapticsBridge.zip
+            upd/*
+          body: |
+            Vibration über Intiface Central und bHaptics-Westen, passend zum Spiel.
+            Ab Version 1.2.0 aktualisiert sich `HapticsBridge.exe` beim Start selbst (abschaltbar mit `"autoUpdate": false`).
+
+            **Download:** `HapticsBridge.zip` unten bei Assets. Die Anleitung steht in `LIESMICH.txt`.
+
+            | Spiel | Was vibriert |
+            |---|---|
+            | Beat Saber (PC, auch Virtual Desktop) | Treffer, Fehler, Bomben, Wände, Level geschafft/verloren. Braucht die Mod DataPuller oder HttpSiraStatus. |
+            | Garry's Mod | Schaden, Tod, wenig Leben (Einzelspieler / eigener Server) |
+            | Minecraft Java 1.21.1 (Fabric) | Schaden, Tod, wenig Leben |
+
+            Haptik-Westen: bHaptics TactSuit, Tactosy-Arme und Tactal über die bHaptics-Player-App (in `config.json` `"vest": { "enabled": true }`).
+
+            Inhalt:
+            - `HapticsBridge.exe`: die Bridge, kein Node.js nötig
+            - `config.json`: für alle drei Spiele eingestellt
+            - `minecraft/mods/`: Haptics-Bridge-Mod und Fabric API
+            - `garrysmod/addons/haptics_bridge/`: GMod-Addon
+            - `LIESMICH.txt`: Anleitung
+
+            Die einzelnen Dateien neben der ZIP (`HapticsBridge.exe`, Mod, Lua) braucht das Auto-Update. Für die erste Installation die ZIP nehmen.
