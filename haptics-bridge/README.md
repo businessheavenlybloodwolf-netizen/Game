@@ -32,7 +32,7 @@ Die Bridge muss immer laufen. Die Spiel-Adapter unten schicken ihr nur die Event
 | **Phasmophobia** | Bildschirm: Tod-Erkennung (experimentell) | Tod | sicher, nur Bildschirm lesen |
 
 **Fertiges Paket** mit `.exe`, Einstellungen, Minecraft-Mod und GMod-Addon:
-[Release haptics-v1.1.0](https://github.com/businessheavenlybloodwolf-netizen/Game/releases/tag/haptics-v1.1.0)
+[neuestes Release](https://github.com/businessheavenlybloodwolf-netizen/Game/releases/latest)
 
 ### Beat Saber
 
@@ -47,6 +47,20 @@ das Summen bei hoher Combo über `beatsaber.comboLevel`.
 Das Addon schreibt nach `garrysmod/data/haptics_bridge.txt`. Die Bridge findet den Steam-Ordner automatisch,
 weil im Pfad `{steam:GarrysMod}` als Platzhalter steht.
 Das Addon läuft nur im Einzelspieler oder auf einem selbst gehosteten Server, weil GMod auf fremden Servern nur Server-Skripte ausführt.
+
+### Haptik-Weste (bHaptics)
+
+`"vest": { "enabled": true }` schickt alle Events zusätzlich an die bHaptics-Player-App (`ws://127.0.0.1:15881/v2/feedbacks`).
+Welches Muster pro Event gespielt wird, steht in `vest.patterns`: `burst`, `side`, `tap`, `wave`, `death` oder `off`.
+Die Motoren für den Herzschlag stehen in `vest.heartDots`, Index = Reihe × 4 + Spalte, vorne 0–19.
+Mit `"intifaceUrl": ""` läuft die Bridge nur mit der Weste.
+
+### Auto-Update
+
+Die `.exe` fragt beim Start das neueste GitHub-Release ab (`haptics-v*`). Ist es neuer, lädt sie `HapticsBridge.exe` herunter,
+prüft die SHA-256-Prüfsumme, die GitHub angibt, ersetzt sich selbst und startet neu.
+Installierte Minecraft-Mod und GMod-Addon werden mit aktualisiert. Abschalten: `"autoUpdate": false` oder `--kein-update`.
+Eine neue Version veröffentlichst du, indem du `version` in `package.json` erhöhst und pushst. Der Workflow erstellt dann `haptics-vX.Y.Z`.
 
 ### VRChat
 

@@ -33,6 +33,7 @@ export class Intiface {
         const res = await this.request({ RequestServerInfo: { ClientName: 'Haptics Bridge', MessageVersion: 3 } });
         const info = res.ServerInfo;
         this.connected = true;
+        this.warned = false;
         this.log(`Intiface verbunden (${info.ServerName}).`);
         if (info.MaxPingTime > 0) {
           this.pingTimer = setInterval(() => this.request({ Ping: {} }).catch(() => {}), Math.max(100, info.MaxPingTime / 2));
@@ -57,7 +58,9 @@ export class Intiface {
       this.pending.clear();
       this.devices.clear();
       if (this.stopped) return;
-      this.log(was ? 'Intiface getrennt, verbinde neu ...' : `Intiface nicht erreichbar (${this.url}), neuer Versuch in 3 s ...`);
+      if (was) this.log('Intiface getrennt, verbinde neu ...');
+      else if (!this.warned) this.log(`Intiface Central nicht erreichbar (${this.url}). Läuft es und ist "Start Server" gedrückt? Ich versuche es weiter.`);
+      this.warned = !was;
       setTimeout(() => this.connect(), RECONNECT_MS);
     };
   }
@@ -152,6 +155,14 @@ export class Intiface {
     if (this.connected) await this.request({ StopAllDevices: {} }).catch(() => {});
     this.ws?.close();
   }
+}
+
+// Ohne Intiface (intifaceUrl leer), z. B. wenn nur eine bHaptics-Weste benutzt wird.
+export class NullOutput {
+  constructor() { this.devices = new Map(); this.connected = false; }
+  start() {}
+  set() {}
+  async stop() {}
 }
 
 // Ausgabe für --dry: zeigt die Stärke als Balken in der Konsole.

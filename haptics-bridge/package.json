@@ -1,10 +1,12 @@
 {
   "name": "haptics-bridge",
-  "version": "1.0.0",
+  "version": "1.2.0",
   "description": "Lässt Geräte über Intiface vibrieren, wenn man in Spielen Schaden nimmt",
   "type": "module",
   "private": true,
-  "engines": { "node": ">=22" },
+  "engines": {
+    "node": ">=22"
+  },
   "scripts": {
     "start": "node bridge.mjs",
     "dry": "node bridge.mjs --dry",

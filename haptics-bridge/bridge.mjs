@@ -4,11 +4,15 @@
 //   node bridge.mjs --dry           ohne Intiface, Stärke nur in der Konsole anzeigen
 //   node bridge.mjs --vrchat        VRChat-OSC einschalten
 //   node bridge.mjs --config x.json andere Konfigurationsdatei
+//   --kein-update                   (nur .exe) nicht nach Updates suchen
 
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { Intiface, DryOutput } from './src/intiface.js';
+import { Intiface, DryOutput, NullOutput } from './src/intiface.js';
+import { Vest } from './src/vest.js';
+import { autoUpdate } from './src/update.js';
+import pkg from './package.json' with { type: 'json' };
 import { Engine } from './src/engine.js';
 import { startServer } from './src/server.js';
 import { cs2, dota2 } from './src/adapters/valve-gsi.js';
@@ -69,9 +73,18 @@ function loadConfig() {
 }
 
 function start(cfg) {
-  const output = dry ? new DryOutput() : new Intiface({ url: cfg.intifaceUrl, deviceFilter: cfg.devices, log });
+  const output = dry ? new DryOutput()
+    : cfg.intifaceUrl ? new Intiface({ url: cfg.intifaceUrl, deviceFilter: cfg.devices, log })
+    : new NullOutput();
   output.start();
   const engine = new Engine(cfg, output, log);
+
+  let vest = null;
+  if (cfg.vest.enabled) {
+    vest = new Vest(cfg.vest, log);
+    vest.start();
+    engine.listeners.push(vest);
+  }
 
   const routes = {};
   if (cfg.games.cs2) routes['/cs2'] = cs2(engine);
@@ -96,6 +109,7 @@ function start(cfg) {
     engine.stop();
     server.close();
     await output.stop();
+    await vest?.stop();
     process.exit(0);
   };
   process.on('SIGINT', quit);
@@ -103,5 +117,12 @@ function start(cfg) {
   process.on('SIGHUP', quit); // Fenster geschlossen (Windows)
 }
 
-const cfg = loadConfig();
-if (cfg) start(cfg);
+async function main() {
+  log(`Haptics Bridge ${pkg.version}`);
+  const cfg = loadConfig();
+  if (!cfg) return;
+  const skip = !isExe || dry || cfg.autoUpdate === false || args.includes('--kein-update') || args.includes('--nach-update');
+  if (!skip && await autoUpdate({ current: pkg.version, exePath: process.execPath, args, log })) return;
+  start(cfg);
+}
+main();

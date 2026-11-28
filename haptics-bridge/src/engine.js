@@ -10,6 +10,7 @@ export class Engine {
     this.pulses = [];
     this.health = null; // 0..1 oder null, wenn unbekannt
     this.levels = new Map(); // dauerhafte Stärken, z. B. VRChat-Kontakte (Schlüssel -> 0..1)
+    this.listeners = []; // weitere Ausgaben, z. B. bHaptics-Weste: { event(ev, intensity, ms), tick(level, beat) }
     this.last = -1;
     this.timer = setInterval(() => this.tick(), 50);
   }
@@ -28,6 +29,7 @@ export class Engine {
     if (ev.intensity != null) intensity = clamp(Number(ev.intensity));
     if (ev.durationMs != null) duration = Number(ev.durationMs);
     this.pulses.push({ start: Date.now(), intensity: clamp(intensity), duration, fade: Math.min(p.fadeMs ?? 0, duration) });
+    for (const l of this.listeners) l.event?.(ev, clamp(intensity), duration);
     if (p.log === false) return true; // häufige Events (z. B. jede Note) nicht ins Fenster schreiben
     const amt = ev.amount != null ? ` ${ev.amount}` : '';
     this.log(`${ev.source ? `[${ev.source}] ` : ''}${ev.type}${amt} -> ${(intensity * 100).toFixed(0)} % für ${Math.round(duration)} ms`);
@@ -60,21 +62,24 @@ export class Engine {
       return true;
     });
     // Mehrere Treffer kurz hintereinander verstärken sich leicht.
-    let v = clamp(max + 0.3 * (sum - max));
-    for (const l of this.levels.values()) v = Math.max(v, l);
+    const pulse = clamp(max + 0.3 * (sum - max));
+    let steady = 0;
+    for (const l of this.levels.values()) steady = Math.max(steady, l);
 
+    let beat = 0;
     const lh = this.cfg.lowHealth;
     if (lh?.enabled && this.health != null && this.health > 0 && this.health < lh.threshold) {
       // Herzschlag: zwei kurze Schläge pro Periode
       const ph = (now % lh.periodMs) / lh.periodMs;
-      const beat = ph < 0.1 || (ph > 0.2 && ph < 0.3) ? lh.intensity : 0;
-      v = Math.max(v, beat);
+      beat = ph < 0.1 || (ph > 0.2 && ph < 0.3) ? lh.intensity : 0;
     }
-    return v;
+    return { pulse, steady, beat, total: Math.max(pulse, steady, beat) };
   }
 
   tick() {
-    const v = Math.round(this.level(Date.now()) * clamp(this.cfg.maxIntensity) * 100) / 100;
+    const l = this.level(Date.now());
+    for (const o of this.listeners) o.tick?.(l.steady, l.beat);
+    const v = Math.round(l.total * clamp(this.cfg.maxIntensity) * 100) / 100;
     if (v !== this.last && (Math.abs(v - this.last) >= 0.03 || v === 0)) {
       this.last = v;
       this.out.set(v);

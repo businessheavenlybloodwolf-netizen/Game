@@ -1,5 +1,6 @@
 {
   "intifaceUrl": "ws://127.0.0.1:12345",
+  "autoUpdate": true,
   "port": 3110,
   "token": "",
   "maxIntensity": 0.8,
@@ -101,5 +102,23 @@
   "gmod": {
     "enabled": false,
     "file": "{steam:GarrysMod}/garrysmod/data/haptics_bridge.txt"
+  },
+  "vest": {
+    "enabled": false,
+    "url": "ws://127.0.0.1:15881/v2/feedbacks",
+    "maxIntensity": 0.8,
+    "heartDots": [
+      1,
+      5
+    ],
+    "patterns": {
+      "damage": "burst",
+      "death": "death",
+      "hit": "burst",
+      "bs_hit": "tap",
+      "bs_miss": "side",
+      "bs_bomb": "burst",
+      "bs_clear": "wave"
+    }
   }
 }

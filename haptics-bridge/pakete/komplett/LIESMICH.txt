@@ -1,8 +1,18 @@
 ﻿HAPTICS BRIDGE: MINECRAFT, BEAT SABER, GARRY'S MOD
 ==================================================
 
-Dein Gerät vibriert passend zum Spiel. Alle drei Spiele laufen mit derselben
-HapticsBridge.exe, du musst nichts umstellen.
+Dein Gerät (über Intiface Central) und/oder deine bHaptics-Weste vibrieren passend zum Spiel.
+Alle drei Spiele laufen mit derselben HapticsBridge.exe, du musst nichts umstellen.
+
+
+AUTO-UPDATE
+-----------
+
+HapticsBridge.exe schaut bei jedem Start, ob es eine neue Version gibt, und installiert sie
+selbst. Deine config.json bleibt dabei unverändert. Ist die Minecraft-Mod oder das GMod-Addon
+installiert, werden die gleich mit aktualisiert. Jede Datei wird vor der Installation mit der
+Prüfsumme von GitHub verglichen.
+Ausschalten: in config.json "autoUpdate": false setzen.
 
 
 GRUNDLAGE (EINMALIG)
@@ -22,6 +32,27 @@ JEDES MAL ZUM SPIELEN
 Beim ersten Start warnt Windows eventuell ("Der Computer wurde durch Windows geschützt"),
 weil die .exe nicht signiert ist. Dann auf "Weitere Informationen" und "Trotzdem ausführen" klicken.
 Zum Beenden das Fenster schließen oder Strg+C drücken.
+
+
+HAPTIK-WESTE (bHaptics)
+-----------------------
+
+Unterstützt: bHaptics TactSuit (X16, X40, Pro), Tactosy-Arme und Tactal (Kopf).
+
+1. bHaptics Player (bzw. "bHaptics Hub") am PC installieren und die Weste dort koppeln.
+2. In config.json bei "vest" "enabled": true setzen.
+3. HapticsBridge.exe neu starten. Im Fenster steht "bHaptics Player verbunden" und welche
+   Geräte verbunden sind.
+
+So fühlt es sich an:
+  Schaden            ganze Weste und Arme, je nach Stärke
+  Tod                drei starke Stöße (mit Tactal auch am Kopf)
+  Wenig Leben        Herzschlag links auf der Brust
+  Beat Saber         Treffer links/rechts auf der Seite und dem Arm des jeweiligen Säbels,
+                     Wände dauerhaft, Level geschafft als Welle von unten nach oben
+
+Nur Weste, ohne Intiface: in config.json "intifaceUrl": "" setzen.
+Weste stärker/schwächer: "vest": { "maxIntensity": 0.8 } (0 bis 1).
 
 
 BEAT SABER (PC-Version, auch über Virtual Desktop)

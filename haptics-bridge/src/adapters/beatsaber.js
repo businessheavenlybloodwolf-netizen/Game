@@ -9,7 +9,8 @@ const RETRY_MS = 3000;
 export function startBeatSaber(cfg, engine, log = console.log) {
   const stops = [];
   const src = 'Beat Saber';
-  const ev = (type) => engine.trigger({ type, source: src });
+  const ev = (type, side) => engine.trigger({ type, source: src, side });
+  const sideOf = (saber) => (saber === 'SaberA' || saber === 0 ? 'left' : saber === 'SaberB' || saber === 1 ? 'right' : undefined);
 
   // Wände: dauerhafte Vibration, solange man drin steht.
   let wallTimer = null;
@@ -36,7 +37,7 @@ export function startBeatSaber(cfg, engine, log = console.log) {
         const misses = d.Misses - last.Misses;
         const hits = d.Combo > last.Combo ? Math.min(d.Combo - last.Combo, 3) : 0;
         for (let i = 0; i < misses && i < 3; i++) ev('bs_miss');
-        for (let i = 0; i < hits; i++) ev('bs_hit');
+        for (let i = 0; i < hits; i++) ev('bs_hit', sideOf(d.ColorType));
         // Energie sinkt ohne neuen Fehler: Wand (oder Bombe, die DataPuller nicht extra meldet)
         if (d.PlayerHealth < last.PlayerHealth && misses === 0) wall(true, 250);
         combo(d.Combo);
@@ -64,7 +65,7 @@ export function startBeatSaber(cfg, engine, log = console.log) {
           if (d.event === 'noteFullyCut') break; // nur einmal pro Note
           const c = d.noteCut || {};
           const bad = c.speedOK === false || c.directionOK === false || c.saberTypeOK === false || c.wasCutTooSoon === true;
-          ev(bad ? 'bs_miss' : 'bs_hit');
+          ev(bad ? 'bs_miss' : 'bs_hit', sideOf(c.saberType));
           break;
         }
         case 'noteMissed': ev('bs_miss'); break;
