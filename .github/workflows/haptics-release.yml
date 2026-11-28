@@ -1,8 +1,8 @@
-name: Minecraft-Paket bauen und veröffentlichen
+name: Haptics-Bridge-Paket bauen und veröffentlichen
 
 on:
   push:
-    paths: ['haptics-bridge/**', '.github/workflows/minecraft-release.yml']
+    paths: ['haptics-bridge/**', '.github/workflows/haptics-release.yml']
   workflow_dispatch:
 
 permissions:
@@ -55,7 +55,7 @@ jobs:
       - uses: actions/download-artifact@v4
         with:
           name: mods
-          path: pkg/mods
+          path: pkg/minecraft/mods
 
       - name: Bridge zu HapticsBridge.exe bauen
         run: |
@@ -64,7 +64,9 @@ jobs:
           node --experimental-sea-config sea.json
           Copy-Item (Get-Command node).Source pkg/HapticsBridge.exe
           npx --yes postject@1.0.0-alpha.6 pkg/HapticsBridge.exe NODE_SEA_BLOB build/prep.blob --sentinel-fuse NODE_SEA_FUSE_fce680ab2cc467b6e072b8b5df1996b2
-          Copy-Item haptics-bridge/pakete/minecraft/config.json, haptics-bridge/pakete/minecraft/LIESMICH.txt pkg/
+          Copy-Item haptics-bridge/pakete/komplett/config.json, haptics-bridge/pakete/komplett/LIESMICH.txt pkg/
+          New-Item -ItemType Directory -Force pkg/garrysmod/addons | Out-Null
+          Copy-Item -Recurse haptics-bridge/gmod-addon/haptics_bridge pkg/garrysmod/addons/
 
       - name: HapticsBridge.exe testen
         run: |
@@ -77,31 +79,40 @@ jobs:
           if (-not $r.ok) { throw 'Event wurde nicht angenommen' }
           if (-not (Select-String out.txt -Pattern 'Konfiguration geladen' -Quiet)) { throw 'config.json neben der .exe wurde nicht gefunden' }
           if (-not (Select-String out.txt -Pattern '\[Minecraft\] damage' -Quiet)) { throw 'Schaden kam nicht an' }
+          if (-not (Select-String out.txt -Pattern '\[Beat Saber\] warte' -Quiet)) { throw 'Beat-Saber-Adapter nicht gestartet' }
+          if (-not (Select-String out.txt -Pattern "\[Garry's Mod\]" -Quiet)) { throw 'GMod-Adapter nicht gestartet' }
           Get-ChildItem -Recurse pkg | Select-Object FullName, Length
 
       - name: ZIP packen
-        run: Compress-Archive -Path pkg/* -DestinationPath HapticsBridge-Minecraft.zip
+        run: Compress-Archive -Path pkg/* -DestinationPath HapticsBridge.zip
 
       - uses: actions/upload-artifact@v4
         with:
-          name: HapticsBridge-Minecraft
-          path: HapticsBridge-Minecraft.zip
+          name: HapticsBridge
+          path: HapticsBridge.zip
 
       - name: Release veröffentlichen
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: minecraft-v1.0.0
+          tag_name: haptics-v1.1.0
           target_commitish: ${{ github.sha }}
-          name: Haptics Bridge für Minecraft 1.0.0
+          name: Haptics Bridge 1.1.0 (Minecraft, Beat Saber, Garry's Mod)
           make_latest: true
-          files: HapticsBridge-Minecraft.zip
+          files: HapticsBridge.zip
           body: |
-            Vibration über Intiface, wenn du in Minecraft (Java 1.21.1, Fabric) Schaden nimmst.
+            Vibration über Intiface Central, passend zum Spiel.
 
-            **Download:** `HapticsBridge-Minecraft.zip` unten bei Assets.
+            **Download:** `HapticsBridge.zip` unten bei Assets. Die Anleitung steht in `LIESMICH.txt`.
+
+            | Spiel | Was vibriert |
+            |---|---|
+            | Beat Saber (PC, auch Virtual Desktop) | Treffer, Fehler, Bomben, Wände, Level geschafft/verloren. Braucht die Mod DataPuller oder HttpSiraStatus. |
+            | Garry's Mod | Schaden, Tod, wenig Leben (Einzelspieler / eigener Server) |
+            | Minecraft Java 1.21.1 (Fabric) | Schaden, Tod, wenig Leben |
 
             Inhalt:
             - `HapticsBridge.exe`: die Bridge, kein Node.js nötig
-            - `config.json`: für Minecraft eingestellt
-            - `mods/`: Haptics-Bridge-Mod und Fabric API, gehören nach `%AppData%\.minecraft\mods`
-            - `LIESMICH.txt`: Schritt-für-Schritt-Anleitung
+            - `config.json`: für alle drei Spiele eingestellt
+            - `minecraft/mods/`: Haptics-Bridge-Mod und Fabric API
+            - `garrysmod/addons/haptics_bridge/`: GMod-Addon
+            - `LIESMICH.txt`: Anleitung

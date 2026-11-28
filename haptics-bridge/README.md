@@ -23,11 +23,30 @@ Die Bridge muss immer laufen. Die Spiel-Adapter unten schicken ihr nur die Event
 
 | Spiel | Weg | Was vibriert | Anti-Cheat |
 |---|---|---|---|
+| **Beat Saber** (PC / Virtual Desktop) | Mod DataPuller oder HttpSiraStatus | Treffer, Fehler, Bomben, Wände, Level geschafft/verloren | Einzelspieler-Mods |
+| **Garry's Mod** | Lua-Addon (`gmod-addon/`) | Schaden, Tod, Herzschlag | nur Einzelspieler / eigener Server |
 | **VRChat** | OSC (eingebaut) | Berührungen am Avatar (Contacts), Treffer | sicher, offizielle Schnittstelle |
 | **Minecraft** (Java) | eigene Fabric-Mod | jeder Schaden, Tod, Herzschlag bei wenig Leben | nur Client-Mod, auf Servern unsichtbar |
 | **Spider-Man Remastered** | Bildschirm: Lebensbalken | Schaden nach Stärke, Herzschlag | sicher, nur Bildschirm lesen |
 | **Voidtrain** | Bildschirm: Lebensbalken | Schaden nach Stärke, Herzschlag | sicher, nur Bildschirm lesen |
 | **Phasmophobia** | Bildschirm: Tod-Erkennung (experimentell) | Tod | sicher, nur Bildschirm lesen |
+
+**Fertiges Paket** mit `.exe`, Einstellungen, Minecraft-Mod und GMod-Addon:
+[Release haptics-v1.1.0](https://github.com/businessheavenlybloodwolf-netizen/Game/releases/tag/haptics-v1.1.0)
+
+### Beat Saber
+
+Die Mod **DataPuller** (oder **HttpSiraStatus**) mit BSManager oder ModAssistant installieren und in `config.json`
+`"beatsaber": { "enabled": true }` setzen. Die Bridge verbindet sich automatisch, sobald Beat Saber läuft.
+Alle Stärken stehen unter `events` (`bs_hit`, `bs_miss`, `bs_bomb`, `bs_clear`). Wände stellst du über `beatsaber.wallIntensity` ein,
+das Summen bei hoher Combo über `beatsaber.comboLevel`.
+
+### Garry's Mod
+
+`gmod-addon/haptics_bridge` nach `GarrysMod/garrysmod/addons/` kopieren und `"gmod": { "enabled": true }` setzen.
+Das Addon schreibt nach `garrysmod/data/haptics_bridge.txt`. Die Bridge findet den Steam-Ordner automatisch,
+weil im Pfad `{steam:GarrysMod}` als Platzhalter steht.
+Das Addon läuft nur im Einzelspieler oder auf einem selbst gehosteten Server, weil GMod auf fremden Servern nur Server-Skripte ausführt.
 
 ### VRChat
 

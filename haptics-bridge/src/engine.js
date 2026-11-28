@@ -28,6 +28,7 @@ export class Engine {
     if (ev.intensity != null) intensity = clamp(Number(ev.intensity));
     if (ev.durationMs != null) duration = Number(ev.durationMs);
     this.pulses.push({ start: Date.now(), intensity: clamp(intensity), duration, fade: Math.min(p.fadeMs ?? 0, duration) });
+    if (p.log === false) return true; // häufige Events (z. B. jede Note) nicht ins Fenster schreiben
     const amt = ev.amount != null ? ` ${ev.amount}` : '';
     this.log(`${ev.source ? `[${ev.source}] ` : ''}${ev.type}${amt} -> ${(intensity * 100).toFixed(0)} % für ${Math.round(duration)} ms`);
     return true;

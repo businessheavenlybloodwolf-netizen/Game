@@ -22,6 +22,28 @@
       "intensity": 0.35,
       "durationMs": 150,
       "fadeMs": 80
+    },
+    "bs_hit": {
+      "intensity": 0.25,
+      "durationMs": 70,
+      "fadeMs": 30,
+      "log": false
+    },
+    "bs_miss": {
+      "intensity": 0.6,
+      "durationMs": 250,
+      "fadeMs": 100,
+      "log": false
+    },
+    "bs_bomb": {
+      "intensity": 0.85,
+      "durationMs": 400,
+      "fadeMs": 150
+    },
+    "bs_clear": {
+      "intensity": 0.7,
+      "durationMs": 1500,
+      "fadeMs": 600
     }
   },
   "lowHealth": {
@@ -64,5 +86,20 @@
         "threshold": 0.5
       }
     ]
+  },
+  "beatsaber": {
+    "enabled": false,
+    "dataPuller": "ws://127.0.0.1:2946/BSDataPuller",
+    "httpStatus": "ws://127.0.0.1:6557/socket",
+    "wallIntensity": 0.5,
+    "comboLevel": {
+      "enabled": false,
+      "max": 0.2,
+      "at": 200
+    }
+  },
+  "gmod": {
+    "enabled": false,
+    "file": "{steam:GarrysMod}/garrysmod/data/haptics_bridge.txt"
   }
 }

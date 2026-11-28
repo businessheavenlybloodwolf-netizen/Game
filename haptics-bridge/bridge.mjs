@@ -14,6 +14,7 @@ import { startServer } from './src/server.js';
 import { cs2, dota2 } from './src/adapters/valve-gsi.js';
 import { watchLog } from './src/adapters/logwatch.js';
 import { startVrchatOsc } from './src/adapters/vrchat-osc.js';
+import { startBeatSaber } from './src/adapters/beatsaber.js';
 import exampleConfig from './config.example.json' with { type: 'json' };
 
 // Als einzelne .exe (Node SEA) liegt config.json neben der .exe, sonst neben diesem Skript.
@@ -42,6 +43,13 @@ function merge(base, over) {
   for (const k of Object.keys(over)) out[k] = typeof base?.[k] === 'object' && !Array.isArray(base[k]) ? merge(base[k], over[k]) : over[k];
   return out;
 }
+
+// Zeilen, die das Lua-Addon (gmod-addon/) in garrysmod/data/haptics_bridge.txt schreibt.
+const GMOD_RULES = [
+  { match: '^HB damage ([\\d.]+) ([\\d.]+)', event: 'damage', amountGroup: 1, maxGroup: 2 },
+  { match: '^HB death', event: 'death' },
+  { match: '^HB health ([\\d.-]+)', event: 'health', valueGroup: 1 },
+];
 
 function loadConfig() {
   const defaults = structuredClone(exampleConfig);
@@ -73,6 +81,11 @@ function start(cfg) {
   const stops = cfg.logWatchers.filter((w) => w.enabled !== false).map((w) => watchLog(w, engine, log));
   if (vrc) cfg.vrchat.enabled = true;
   if (cfg.vrchat.enabled) stops.push(startVrchatOsc(cfg.vrchat, engine, log));
+  if (cfg.beatsaber.enabled) {
+    log('[Beat Saber] warte auf das Spiel (Mod DataPuller oder HttpSiraStatus) ...');
+    stops.push(startBeatSaber(cfg.beatsaber, engine, log));
+  }
+  if (cfg.gmod.enabled) stops.push(watchLog({ name: "Garry's Mod", file: cfg.gmod.file, rules: GMOD_RULES }, engine, log));
 
   let quitting = false;
   const quit = async () => {
