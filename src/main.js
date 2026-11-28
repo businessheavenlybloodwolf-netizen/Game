@@ -460,11 +460,19 @@ class Game {
       if (pt) {
         const a = Math.atan2(pt.x, pt.z);
         const dx = -Math.sin(pt.mesh ? 0 : 0);
-        this.player.reset(pt.x + Math.sin(a) * 0, pt.y, pt.z, 0);
+        this.player.reset(pt.x + Math.sin(a) * 0, pt.pipe ? pt.top + 0.05 : pt.y, pt.z, 0);
         // vor das Tor stellen (Richtung Inselmitte)
         const iso = this.level.colliders.find((c) => c.type === 'cyl' && Math.hypot(c.x - pt.x, c.z - pt.z) < c.r && Math.abs(c.maxY - pt.y) < 0.1);
-        if (iso) { const vx = iso.x - pt.x, vz = iso.z - pt.z, l = Math.hypot(vx, vz) || 1; this.player.pos.x += vx / l * 2.8; this.player.pos.z += vz / l * 2.8; }
-        this.checkpoint = { x: this.player.pos.x, y: pt.y, z: this.player.pos.z, yaw: Math.atan2(pt.x - this.player.pos.x, pt.z - this.player.pos.z) };
+        if (iso && pt.pipe) {
+          // aus der Röhre herausspringen, Richtung Inselmitte
+          const vx = iso.x - pt.x, vz = iso.z - pt.z, l = Math.hypot(vx, vz) || 1;
+          this.player.vel.set(vx / l * 3.2, 13, vz / l * 3.2); this.player.grounded = false;
+          this.player.facing = Math.atan2(vx, vz);
+          this.audio.play('bounce');
+          this.checkpoint = { x: pt.x + vx / l * 2.8, y: pt.y, z: pt.z + vz / l * 2.8, yaw: Math.atan2(-vx, -vz) };
+          this.camYaw = this.checkpoint.yaw; this.camTarget.copy(this.player.pos);
+        } else if (iso) { const vx = iso.x - pt.x, vz = iso.z - pt.z, l = Math.hypot(vx, vz) || 1; this.player.pos.x += vx / l * 2.8; this.player.pos.z += vz / l * 2.8; }
+        if (!pt.pipe) this.checkpoint = { x: this.player.pos.x, y: pt.y, z: this.player.pos.z, yaw: Math.atan2(pt.x - this.player.pos.x, pt.z - this.player.pos.z) };
         this.camYaw = this.checkpoint.yaw; this.camTarget.copy(this.player.pos);
         void dx;
       }
@@ -491,7 +499,7 @@ class Game {
     if (it.kind === 'ship') { this.showTravel(); return; }
     if (it.kind === 'portal') {
       if (it.locked) { this.hud.toast(it.target.type === 'boss' ? t('ui.needMoonsBoss', { n: this.bossReq(w) }) : t('ui.needKey'), 2.5); this.audio.play('hurt'); return; }
-      this.enterChallenge(it.target);
+      this.enterChallenge(it.target, it);
       return;
     }
     if (it.kind === 'quest') { this.questTalk(it); return; }
@@ -541,10 +549,18 @@ class Game {
     this.hud.showMenu({ title: t('quest.log'), subtitle: t(`worlds.${w}.name`), body: `<div class="qlist">${rows}</div>`, items: [{ label: t('ui.back'), action: () => { this.state = 'play'; this.pause(); } }] });
   }
 
-  enterChallenge(target) {
+  enterChallenge(target, it = null) {
     const w = this.cur.w;
     this.returnTo = { w, target };
     const i = target.type === 'boss' ? BOSS_IDX : target.type === 'bonus' ? BONUS_IDX : target.i;
+    if (it && it.pipe) {
+      // Röhre: auf den Rand hüpfen, hineinsinken, dann ins Herausforderungs-Level
+      this.state = 'pipe';
+      this.pipeAnim = { t: 0, it, w, i, from: this.player.pos.clone(), sank: false };
+      this.player.vel.set(0, 0, 0);
+      this.audio.play('jump');
+      return;
+    }
     this.hud.fade(true);
     this.audio.play('confirm');
     setTimeout(() => { this.hud.fade(false); this.startLevel(w, i); }, 350);
@@ -967,6 +983,26 @@ class Game {
           if (it && input.interactPressed()) this.interact(it);
         }
         break;
+      case 'pipe': {
+        const A = this.pipeAnim, p = this.player, it = A.it;
+        A.t += dt;
+        p.vel.set(0, 0, 0);
+        if (A.t < 0.45) {
+          const k = A.t / 0.45;
+          p.pos.set(A.from.x + (it.x - A.from.x) * k, A.from.y + (it.top - A.from.y) * k + Math.sin(k * Math.PI) * 1.6, A.from.z + (it.z - A.from.z) * k);
+          p.facing = Math.atan2(it.x - A.from.x, it.z - A.from.z);
+        } else {
+          if (!A.sank) { A.sank = true; this.audio.play('pound'); this.particles.burst(new THREE.Vector3(it.x, it.top + 0.3, it.z), { count: 18, color: [0x9ff4ff, 0xffffff], speed: 4, size: 0.6, tex: 'sparkle', additive: true }); }
+          const k = Math.min(1, (A.t - 0.45) / 0.6);
+          p.pos.set(it.x, it.top - k * 1.7, it.z);
+          p.mesh.scale.setScalar(1 - k * 0.45);
+          p.facing += dt * 8;
+          if (A.t > 0.85 && !A.faded) { A.faded = true; this.hud.fade(true); }
+          if (A.t > 1.2) { this.state = 'transition'; p.mesh.scale.setScalar(1); this.hud.fade(false); this.startLevel(A.w, A.i); }
+        }
+        this.stepWorldOnly(dt);
+        break;
+      }
       case 'paused':
         if (input.pausePressed()) this.resume();
         break;

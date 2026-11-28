@@ -4,7 +4,9 @@ import { RoundedBoxGeometry } from 'three/examples/jsm/geometries/RoundedBoxGeom
 
 // Plattform-Zylinder mit abgerundeter Oberkante. Gruppen wie bei CylinderGeometry: 0 = Seite, 1 = Oberseite (inkl. Rundung), 2 = Unterseite.
 // Oben und an der Rundung sind die UVs weltbezogen (x/z), damit Gras und Pflaster nahtlos weiterlaufen.
-export function roundPlatform(r, rb, h, seg, ox, oy, oz, tile = 4) {
+export function roundPlatform(r, rb, h, seg, ox, oy, oz, tile = 4, seed = null) {
+  // organische Umrisslinie: leicht unregelmäßig wie ein natürlicher Fels (nie kleiner als der Kollisionsradius)
+  const shape = seed === null ? () => 1 : (a) => 1.03 + 0.045 * Math.sin(a * 3 + seed) + 0.03 * Math.sin(a * 5 + seed * 1.7) + 0.015 * Math.sin(a * 9 + seed * 2.3) + 0.09 * 0;
   const bevel = Math.min(0.45, r * 0.14, h * 0.3);
   const pos = [], nor = [], uv = [], idx = [];
   const rows = []; // jede Zeile: { rad, y, nr, ny, mode }
@@ -25,7 +27,8 @@ export function roundPlatform(r, rb, h, seg, ox, oy, oz, tile = 4) {
   for (const rw of rows) {
     for (let j = 0; j <= seg; j++) {
       const a = j / seg * Math.PI * 2, c = Math.cos(a), s = Math.sin(a);
-      const x = c * rw.rad, z = s * rw.rad;
+      const k = Math.max(0.985, shape(a));
+      const x = c * rw.rad * k, z = s * rw.rad * k;
       pos.push(x, rw.y, z);
       nor.push(c * rw.nr, rw.ny, s * rw.nr);
       if (rw.mode === 'side') uv.push(a * r / tile, (rw.y + oy) / tile);
@@ -133,15 +136,15 @@ export function pebble(r, seed = 1) {
 // Felssäule unter einer Plattform bis zum Boden: leicht verbeult, unten breiter auslaufend. Oben (y = 0) Radius r, unten bei y = -h.
 export function pillar(r, h, seed = 1, tile = 4) {
   const seg = Math.max(20, Math.min(48, Math.round(r * 7)));
-  const rings = Math.max(3, Math.round(h / 2.2));
+  const rings = Math.max(4, Math.round(h / 1.4));
   const pos = [], uv = [], idx = [];
   const S = seg + 1;
   for (let i = 0; i <= rings; i++) {
     const t = i / rings, y = -h * t;
-    const flare = 1 + Math.pow(t, 3) * 0.35;
+    const flare = 1 + Math.pow(t, 2.2) * 0.6 + Math.sin(y * 0.45 + seed) * 0.05;
     for (let j = 0; j <= seg; j++) {
       const a = j / seg * Math.PI * 2;
-      const n = i === 0 ? 0 : (Math.sin(a * 3 + seed + y * 0.3) * 0.5 + Math.sin(a * 7 + seed * 1.7 - y * 0.5) * 0.3) * 0.07;
+      const n = i === 0 ? 0 : (Math.sin(a * 3 + seed + y * 0.3) * 0.5 + Math.sin(a * 7 + seed * 1.7 - y * 0.5) * 0.3 + Math.sin(a * 2 - seed + y * 0.15) * 0.4) * 0.11;
       const rr = r * 0.96 * flare * (1 + n);
       pos.push(Math.cos(a) * rr, y, Math.sin(a) * rr);
       uv.push(a * r / tile, y / tile);

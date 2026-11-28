@@ -316,7 +316,7 @@ export class Level {
     const h = o.h ?? 3;
     const s = this.surf(o.mat || 'grass');
     // runde Plattform mit abgerundeter Oberkante (nichts Kantiges mehr)
-    const { geo, bevel } = SH.roundPlatform(r, r * (o.taper ?? 0.96), h, o.seg ?? Math.max(28, Math.round(r * 8)), x, top - h / 2, z, o.tile ?? 4);
+    const { geo, bevel } = SH.roundPlatform(r, r * (o.taper ?? 0.96), h, o.seg ?? Math.max(28, Math.round(r * 8)), x, top - h / 2, z, o.tile ?? 4, o.round ? null : x * 0.37 + z * 0.71);
     const m = new THREE.Mesh(geo, [s.side, s.top, s.side]);
     m.position.set(x, top - h / 2, z);
     m.castShadow = true; m.receiveShadow = true;
@@ -532,6 +532,35 @@ export class Level {
     return sp;
   }
 
+  // Röhre zu einem Herausforderungs-Level (statt Lichttor): hineinspringen und ab ins Sublevel
+  pipe(x, top, z, target, name, sub, locked = false) {
+    const g = new THREE.Group(); g.position.set(x, top, z); this.add(g);
+    const bonus = target.type === 'bonus';
+    const body = bonus ? 0xe8b84a : (this.def.pipeColor ?? 0x4fb86a);
+    const H = 1.5, R = 1.25;
+    const bm = M.toon(body, { rough: 0.35, metal: bonus ? 0.6 : 0.1 });
+    const tube = new THREE.Mesh(new THREE.CylinderGeometry(R, R * 1.06, H, 40, 1, true), bm); tube.position.y = H / 2; tube.castShadow = true; g.add(tube);
+    const inner = new THREE.Mesh(new THREE.CylinderGeometry(R * 0.86, R * 0.86, H - 0.1, 40, 1, true), M.toon(0x1a1020, { unique: true }));
+    inner.material.side = THREE.BackSide; inner.position.y = H / 2 + 0.05; g.add(inner);
+    const rimCol = locked ? 0x6a6a7a : (bonus ? 0xffd23f : 0x6fe8d8);
+    const rim = new THREE.Mesh(new THREE.TorusGeometry(R * 1.02, 0.26, 18, 48), M.toon(rimCol, { emissive: locked ? 0x000000 : rimCol, ei: 0.45, unique: true }));
+    rim.rotation.x = Math.PI / 2; rim.position.y = H; g.add(rim);
+    // wirbelndes Licht im Inneren
+    const swirl = new THREE.Mesh(new THREE.CircleGeometry(R * 0.86, 40), M.basic(rimCol, { transparent: true, opacity: locked ? 0.08 : 0.55, additive: true, side: THREE.DoubleSide }));
+    swirl.rotation.x = -Math.PI / 2; swirl.position.y = H - 0.25; g.add(swirl);
+    const glow = M.glowSprite(rimCol, 3.2, locked ? 0.1 : 0.5); glow.position.y = H + 0.4; g.add(glow);
+    // Fuß aus Fels, damit die Röhre im Boden steckt
+    const foot = new THREE.Mesh(new THREE.CylinderGeometry(R * 1.35, R * 1.6, 0.5, 32), M.toon(0x7a6a5a, { map: this.T.stone })); foot.position.y = 0.05; g.add(foot);
+    M.addOutline(tube, 0.04);
+    const labelSprite = this.label(name, sub, x, top + 4.4, z, locked ? '#888' : (bonus ? '#ffd23f' : '#6fe8d8'));
+    this.colliders.push(cylCollider(x, z, R + 0.25, top - 1, top + H + 0.1));
+    const it = { kind: 'portal', pipe: true, x, y: top, z, r: 2.9, top: top + H + 0.1, target, locked, name, disc: swirl, labelSprite, ring: rim };
+    this.interactables.push(it);
+    this.portals.push(it);
+    this.anim.push({ kind: 'pipe', obj: swirl, glow });
+    return it;
+  }
+
   portal(x, top, z, yaw, target, name, sub, locked) {
     const g = new THREE.Group(); g.position.set(x, top, z); g.rotation.y = yaw; this.add(g);
     const col = target.type === 'boss' ? 0xb070ff : target.type === 'bonus' ? 0xffd23f : 0x6fe8d8;
@@ -638,6 +667,16 @@ export class Level {
     }
     const ABYSS = -170;
     const inRegion = (g, x, z, m = 0) => x > g.minX - m && x < g.maxX + m && z > g.minZ - m && z < g.maxZ + m;
+    // Ufer: im Sublevel liegt das ganze Land über dem Wasserspiegel, nur rund um die Strecke ist das Tal geflutet
+    if (!kingdom) for (const g of regions.values()) {
+      const lv = g.level + 1.2;
+      T.base((x, z) => 0); // wird unten neu berechnet
+      T.base((x, z) => {
+        const e = Math.max(0, edge(x, z)) / 80;
+        const hills = lv + tfbm(x / 40, z / 40, seed, 4) * 5 + tfbm(x / 14, z / 14, seed + 3, 3) * 1.4;
+        return hills + Math.pow(Math.min(1.2, e), 1.7) * 50 * (0.6 + 0.8 * tfbm(x / 34, z / 34, seed + 9, 4));
+      });
+    }
     // Bergrücken unter den Inselketten (die Wege steigen mit dem Gelände an)
     if (kingdom) for (const r of recs) if (r.course === null || r.course === undefined) T.liftCircle(r.x, r.z, r.r, r.top - 7.5, 0.33, 26);
     // Plattformen und Sprungwege freihalten (begehbare Hänge)
@@ -650,18 +689,19 @@ export class Level {
       const [ax, ay, az] = l.a, [bx, by, bz] = l.b;
       let hzr = null;
       for (const g of regions.values()) if (inRegion(g, ax, az) && inRegion(g, bx, bz)) { hzr = g; break; }
-      if (hzr) T.capSegment(ax, az, bx, bz, 5, ABYSS, 3.5, 60);
+      if (hzr) T.capSegment(ax, az, bx, bz, 3, hzr.level - 2.8, 0.7, 24);
       else T.capSegment(ax, az, bx, bz, 1.6, Math.min(ay, by) - 2.0, 0.6, 18);
     }
     // Abgrund: rund um die Herausforderungen gibt es keinen Boden – steile Felswände fallen ins Leere
-    for (const g of regions.values()) for (const r of g.recs) T.capCircle(r.x, r.z, r.r + 5, ABYSS, 3.5, 60);
-    for (const g of regions.values()) T.hazards.push({ level: g.level - 6, void: true, minX: g.minX - 30, maxX: g.maxX + 30, minZ: g.minZ - 30, maxZ: g.maxZ + 30 });
+    // Flusstal: rund um die Strecke liegt Wasser (bzw. Lava, Treibsand, Wolken), die Felsen wachsen daraus hervor
+    for (const g of regions.values()) for (const r of g.recs) T.capCircle(r.x, r.z, r.r + 3, g.level - 2.8, 0.7, 24);
+    for (const g of regions.values()) T.hazards.push({ level: g.level, minX: g.minX - 40, maxX: g.maxX + 40, minZ: g.minZ - 40, maxZ: g.maxZ + 40 });
     this.terrain = T;
     const tT1 = performance.now();
     // Gelände-Mesh und Senken-Füllung
     const mesh = T.buildMesh(this.T, wid);
     this.add(mesh);
-    this.hazardMeshes = T.voidMeshes(this.T, wid, this.def.theme);
+    this.hazardMeshes = T.hazardMeshes(this.T, wid);
     for (const hm of this.hazardMeshes) this.add(hm);
     // Plattformen auf den Boden stellen: Felssäulen statt schwebender Inseln
     for (const r of recs) {
@@ -1354,6 +1394,7 @@ export class Level {
       else if (a.kind === 'spin') a.obj.rotation.z += a.sp * dt;
       else if (a.kind === 'spin') a.obj.rotation.y = t * 0.8;
       else if (a.kind === 'windmill') a.obj.rotation.z = t * 0.9;
+      else if (a.kind === 'pipe') { a.obj.rotation.z = t * 1.5; a.obj.scale.setScalar(0.9 + Math.sin(t * 3) * 0.08); }
       else if (a.kind === 'npc') { const b = a.obj.userData.body; b.position.y = Math.abs(Math.sin(t * 3 + a.ph)) * 0.08; b.rotation.z = Math.sin(t * 1.5 + a.ph) * 0.08; }
       else if (a.kind === 'ship') { a.obj.position.y = a.base + Math.sin(t * 0.6 + a.ph) * 0.8; a.obj.userData.prop.rotation.x = t * 12; a.obj.rotation.z = Math.sin(t * 0.5 + a.ph) * 0.04; }
     }

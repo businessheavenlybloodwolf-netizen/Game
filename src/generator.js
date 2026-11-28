@@ -56,6 +56,7 @@ export function generateLevel(L, spec) {
       case 'ice': return L.cyl(x, top, z, rad, { mat: 'ice', ice: true });
       case 'ghost': return L.ghost(x, top, z, rad);
       case 'cloud': return L.cyl(x, top, z, rad, { mat: 'cloud', h: 1.2, underH: rad });
+      case 'stone': return L.cyl(x, top, z, rad, { mat: S.pillar || 'stone', h: 1.6, under: false });
       default: return L.cyl(x, top, z, rad, { mat: S.small, h: 2.5 });
     }
   }
@@ -161,6 +162,32 @@ export function generateLevel(L, spec) {
         L.link(edge(cur, heading), [x, top, z], { jump: 1 });
         L.spark(x, top + 1.2, z);
         pathLen += dist; cur = np;
+      }
+      return true;
+    },
+    // Sublevel: Trittsteine im Zickzack quer über den Fluss
+    stepStones() {
+      const n = 5 + Math.floor(r() * 3), base = heading;
+      for (let i = 0; i < n; i++) {
+        const zig = (i % 2 ? 1 : -1) * R(0.35, 0.6);
+        const p = place(R(1.1, lerp(1.8, 2.6, d)), R(-0.3, 0.45), R(lerp(1.3, 0.95, d), 1.35), 'stone', { heading: base + zig, fixed: true, keepHeading: true });
+        if (!p) return false;
+        if (i % 2 === 0) L.spark(p.x, p.y + 1.2, p.z);
+        cur = p;
+      }
+      heading = base;
+      return true;
+    },
+    // Sublevel: bewachsene Hügel, mal höher, mal tiefer
+    mounds() {
+      const n = 3 + Math.floor(r() * 2);
+      for (let i = 0; i < n; i++) {
+        const up = i % 2 === 0;
+        const p = place(R(2.2, lerp(3.0, 3.6, d)), up ? R(1.0, 2.0) : R(-1.6, -0.6), R(2.6, 3.6), 'island');
+        if (!p) return false;
+        sparkOn(p, 1.4);
+        if (r() < 0.3 + d * 0.3) L.enemy(pick(W.enemies), p.x, p.y, p.z, { range: p.r * 0.4 });
+        cur = p;
       }
       return true;
     },
@@ -343,7 +370,9 @@ export function generateLevel(L, spec) {
   }
 
   // ---------------- Hauptweg ----------------
-  const weights = Object.entries(W.seg);
+  // Sublevels (Herausforderungen hinter den Röhren) bekommen zusätzlich Trittsteine und Hügelsprünge
+  const segW = kind === 'normal' || kind === 'bonus' ? { ...W.seg, stepStones: 2.4, mounds: 1.8 } : W.seg;
+  const weights = Object.entries(segW);
   const total = weights.reduce((s, [, w]) => s + w, 0);
   const chooseSeg = (prev) => {
     for (let k = 0; k < 6; k++) {
@@ -625,7 +654,7 @@ export function generateLevel(L, spec) {
     const bossOpen = g.bossOpen(w);
     L.portal(0, 0, -11, 0, { type: 'boss' }, g.t(`worlds.${w}.boss`), bossOpen ? g.t('ui.boss') : g.t('ui.needMoonsBoss', { n: g.bossReq(w) }), !bossOpen);
     const keyOk = g.hasKey(w);
-    L.portal(-11.5, 0, 5.5, -2.0, { type: 'bonus' }, g.t('ui.bonusLevel'), keyOk ? g.challengeSub(w, 6) : '🔒', !keyOk);
+    L.pipe(-11.5, 0, 5.5, { type: 'bonus' }, g.t('ui.bonusLevel'), keyOk ? g.challengeSub(w, 6) : '🔒', !keyOk);
     if (w === 0) {
       L.hint(4, 0, 10, 3, 'move');
       L.hint(-6, 0, 9.5, 2.6, 'moonstones');
@@ -668,6 +697,14 @@ export function generateLevel(L, spec) {
       if (peak) { arenas.push(peak); peaks.push(peak); }
     }
     for (const a of spokeArenas) arenas.push(a);
+    // ---- Röhren zu den 5 Herausforderungs-Levels (Sublevels): an der ersten Arena jeder Inselkette ----
+    for (let k = 0; k < 5; k++) {
+      const ar = courseAt[k] || start;
+      const pa = (ar.h || 0) + Math.PI / 2 * (k % 2 ? 1 : -1);
+      const off = Math.max(1.5, ar.r - 2.4);
+      const px = ar.x + Math.sin(pa) * off, pz = ar.z - Math.cos(pa) * off;
+      L.pipe(px, ar.y, pz, { type: 'challenge', i: k }, g.t(`worlds.${w}.levels.${k}`), g.challengeSub(w, k), false);
+    }
     for (const a of spokeArenas2) arenas.push(a);
 
     // ---- Mondsplitter-Verstecke ----
@@ -704,35 +741,6 @@ export function generateLevel(L, spec) {
     // ---- Quests: sechs Auftraggeber mit verschiedenen Aufgaben ----
     if (L.quests) buildQuests(spokeArenas, spokeArenas2, peaks);
 
-    // ---- Herausforderungs-Zone: ein Platz am Rand der Himmelsschlucht, von dort 5 Strecken über den Abgrund ----
-    let plaza = null;
-    const zoneTries = [Math.PI - 0.45, Math.PI + 0.45, Math.PI, Math.PI - 0.9, Math.PI + 0.9];
-    for (const h0 of zoneTries) {
-      cur = start; baseH = heading = h0; spread = 0.3;
-      for (let i = 0; i < 3; i++) { if (!SEG.hops()) SEG.stairs(); }
-      plaza = place(R(2, 3), R(0, 1), 12, 'island');
-      if (plaza) break;
-    }
-    if (plaza) {
-      const [dx, dz] = dir(plaza.h);
-      L.checkpoint(plaza.x - dx * 4 + dz * 2, plaza.y, plaza.z - dz * 4 - dx * 2);
-      L.label(g.t('ui.challengeZone'), '', plaza.x - dx * 4, plaza.y + 9.5, plaza.z - dz * 4, '#6fe8d8');
-      L.hint(plaza.x - dx * 4, plaza.y, plaza.z - dz * 4, 4, 'challengeZone', false);
-    }
-    for (let k = 0; k < 5; k++) {
-      const hs = plaza ? plaza.h + (k - 2) * 0.5 : 0;
-      const cand = [0, 0.18, -0.18, 0.36, -0.36, 0.6, -0.6, 0.85, -0.85, 1.1, -1.1].map((o) => hs + o);
-      let ok = plaza && buildCourse(k, plaza, cand);
-      // noch kein Platz? Dann vom Ende einer schon gebauten Strecke weiter hinaus
-      if (!ok && plaza) for (const c of L.courses) { if (!c || !c.goal) continue; const gp = placed.find((q) => Math.abs(q.x - c.goal.x) < 0.01 && Math.abs(q.z - c.goal.z) < 0.01); if (gp && buildCourse(k, gp, [0, 0.5, -0.5, 1, -1, 1.5, -1.5].map((o) => (gp.h || 0) + o))) { ok = true; break; } }
-      if (!ok) {
-        // kein Platz: wie früher ein Lichttor zur eigenen Herausforderung
-        const ar = courseAt[k] || start;
-        const pa = (ar.h || 0) + Math.PI / 2 * (k % 2 ? 1 : -1);
-        const px = ar.x + Math.sin(pa) * (ar.r - 2.6), pz = ar.z - Math.cos(pa) * (ar.r - 2.6);
-        L.portal(px, ar.y, pz, Math.atan2(ar.x - px, ar.z - pz), { type: 'challenge', i: k }, g.t(`worlds.${w}.levels.${k}`), g.challengeSub(w, k), false);
-      }
-    }
   }
 
   // ---------------- Kulisse ----------------

@@ -78,15 +78,17 @@ Jede Welt ist ein frei begehbares **Reich**, eine **große, zusammenhängende La
   | Korallentiefe | Seetang, Muscheln, leuchtende Pilze | Schiffswracks | Blasen |
   | Nebelreich | Laternen, Zahnräder, tote Bäume | Uhrtürme | Nebelschwaden |
 - Alle Plattformen stehen als **Felssäulen und Tafelberge** auf dem Boden. Wer von einem Weg fällt, landet einfach in der Landschaft.
-- **Himmelsschlucht:** Jedes Reich hat eine eigene **Herausforderungs-Zone**. Ein Weg führt vom Hub zu einem Platz am Rand einer großen Schlucht.
-  Dort ist **kein Boden** mehr, nur steile Felswände und tief unten ein Wolkenmeer (im Glutvulkan Lava).
-  Wer in den Abgrund fällt, startet am letzten Checkpoint neu. Boss-Arenen und Bonus-Level schweben ebenfalls über einem Abgrund.
+- Das Reich selbst hat **keine Löcher**: Es ist durchgehend begehbar.
 - In der Mitte liegt eine **Hub-Insel** mit dem Luftschiff **Leuchtfeder**, der Händlerin, einem Glimmling, der sein Kuscheltier vermisst,
   dem **Nebeltor** zum Boss und einem goldenen **Bonustor**.
 - Vom Hub führen **5 lange Inselketten** in alle Richtungen, jede mit zwei Arenen, und sie enden an einem **Gipfel**.
-- **Herausforderungen ohne Ladebildschirm:** Vom Platz der Himmelsschlucht führen die 5 Strecken fächerförmig als schwebende Inseln über den Abgrund.
-  An jeder steht ein **Start-Tor**, das die Zeitmessung startet. Am Ende wartet ein **Ziel-Sockel** mit Mondsplitter.
-  Unterwegs gibt es zwei Geheimnisse, und für alle Funken der Strecke gibt es einen weiteren Splitter. Wer unter der Medaillenzeit bleibt, bekommt die Zeitmedaille.
+- **Röhren zu den Herausforderungen:** An der ersten Arena jeder Inselkette steht eine **Röhre** in der Farbe der Welt, mit Namen und gefundenen Splittern.
+  Lumi hüpft auf den Rand, sinkt hinein und landet im **Herausforderungs-Level** (Sublevel). Nach dem Ziel hüpft Lumi oben wieder aus der Röhre heraus.
+  Das Bonus-Level erreicht man über eine **goldene Röhre**, die sich erst mit dem Geheimschlüssel öffnet.
+- **Sublevel:** Jede Herausforderung liegt in einem eigenen **Flusstal**. Darin fließt je nach Welt Wasser, Lava, Treibsand, Wolken oder Nebel.
+  Der Weg führt über natürlich geformte Felsen und Hügel, die aus dem Fluss ragen, statt über kantige Plattformen.
+  Neue Herausforderungs-Arten sind **Trittsteine** im Zickzack und **Hügelsprünge** auf und ab, dazu Fahrstühle, Bröckelfelsen, Aufwinde und mehr.
+  Wer in den Fluss fällt, startet am letzten Checkpoint neu. Ziel, 2 Geheimnisse, alle Funken und die Zeitmedaille gibt es wie gewohnt.
 - **Quests:** In jedem Reich geben 6 Glimmlinge Aufträge (gelbes **!** über dem Kopf). Pro Reich sind es 6 von 8 Quest-Arten, jedes Reich in anderer Mischung:
 
 | Quest | Aufgabe |
@@ -169,7 +171,7 @@ In heißen Schleifen wird kein Speicher mehr pro Bild erzeugt (verhindert Ruckle
 ## Qualitätssicherung
 
 Der Generator notiert jeden Sprung des Levels, auch die Wege zu allen Geheimnissen. Ein Test-Bot springt jeden einzelnen davon mit
-der echten Spielphysik nach (`__lumi.debugTestLevel(welt, level)` in der Browser-Konsole). Aktueller Stand: **1214 von 1214 Sprüngen in den 8 Reichen (inklusive der 40 Herausforderungen in der Himmelsschlucht) sind schaffbar**, dazu alle Boss- und Bonus-Level. Ein zweiter Bot nimmt alle 48 Quests an und schließt sie ab.
+der echten Spielphysik nach (`__lumi.debugTestLevel(welt, level)` in der Browser-Konsole). Aktueller Stand: **alle 2259 Sprünge sind schaffbar**: 572 in den 8 Reichen und 1687 in den 40 Herausforderungs-Sublevels, 8 Bonus- und 8 Boss-Leveln. Ein zweiter Bot nimmt alle 48 Quests an und schließt sie ab.
 
 ## Steuerung
 
